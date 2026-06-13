@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Agendar{% endblock %} — Prospect Barber</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  {% block extra_css %}{% endblock %}
+
+  <style>
+    /* Layout público — sem sidebar */
+    body { background: var(--bg-main); }
+    .public-topbar {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 12px 0;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .public-brand {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.25rem; letter-spacing: .5px; font-weight: 700;
+      color: var(--text-primary);
+    }
+    .public-brand span { color: var(--gold); }
+    .public-main { min-height: calc(100vh - 120px); padding: 2rem 0; }
+    .public-footer {
+      border-top: 1px solid var(--border-subtle);
+      padding: 16px 0;
+      text-align: center;
+      font-size: .75rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Topbar pública ─────────────────────────────────── -->
+<header class="public-topbar">
+  <div class="container">
+    <div class="d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-scissors text-gold fs-5"></i>
+        <span class="public-brand">Prospect <span>Barber</span></span>
+      </div>
+      {% if current_user.is_authenticated %}
+      <a href="{{ url_for('dashboard.index') }}" class="btn btn-sm btn-outline-gold">
+        <i class="bi bi-grid-1x2 me-1"></i>Painel
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<!-- ── Flash messages ─────────────────────────────────── -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="container mt-3">
+  {% for category, message in messages %}
+  {% set bs_cat = "danger" if category in ("error","danger") else category %}
+  <div class="alert alert-{{ bs_cat }} alert-dismissible fade show py-2 small" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<!-- ── Conteúdo ───────────────────────────────────────── -->
+<main class="public-main">
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+<!-- ── Footer ─────────────────────────────────────────── -->
+<footer class="public-footer">
+  <div class="container">
+    <i class="bi bi-scissors text-gold me-1"></i>
+    © {{ now.year if now is defined else 2026 }} Prospect Barber
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

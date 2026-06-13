@@ -1,0 +1,197 @@
+{% extends "base_public.html" %}
+{% block title %}Agendamento Confirmado{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-5 col-lg-6 col-md-8">
+
+    <!-- Ícone de sucesso -->
+    <div class="text-center mb-4 success-header">
+      <div class="success-icon-wrap mx-auto mb-3">
+        <i class="bi bi-check-circle-fill text-success" style="font-size:3.5rem"></i>
+      </div>
+      <div class="agendado-badge mb-2">Agendado!</div>
+      <h5 class="fw-bold mb-1">Seu horário está confirmado</h5>
+      <p class="text-muted small">
+        Anote os detalhes abaixo e apareça no horário combinado.
+      </p>
+    </div>
+
+    <!-- Card de detalhes -->
+    <div class="card card-dark mb-4">
+      <div class="card-header py-2">
+        <span class="text-gold fw-semibold small">
+          <i class="bi bi-receipt me-2"></i>Detalhes do agendamento
+        </span>
+      </div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+
+          <li class="list-group-item bg-transparent border-secondary py-3 px-4">
+            <div class="row align-items-center">
+              <div class="col-4 text-muted small">
+                <i class="bi bi-person me-1"></i>Cliente
+              </div>
+              <div class="col-8 fw-semibold">
+                {{ appt.customer.name if appt.customer else '—' }}
+              </div>
+            </div>
+          </li>
+
+          <li class="list-group-item bg-transparent border-secondary py-3 px-4">
+            <div class="row align-items-center">
+              <div class="col-4 text-muted small">
+                <i class="bi bi-scissors me-1"></i>Serviço
+              </div>
+              <div class="col-8">
+                <span class="fw-semibold">{{ appt.service.name if appt.service else '—' }}</span>
+                {% if appt.service %}
+                <span class="text-gold ms-2 small">{{ appt.service.price_formatted }}</span>
+                {% endif %}
+              </div>
+            </div>
+          </li>
+
+          <li class="list-group-item bg-transparent border-secondary py-3 px-4">
+            <div class="row align-items-center">
+              <div class="col-4 text-muted small">
+                <i class="bi bi-person-badge me-1"></i>Barbeiro
+              </div>
+              <div class="col-8 fw-semibold">
+                {{ appt.barber.name if appt.barber else '—' }}
+              </div>
+            </div>
+          </li>
+
+          <li class="list-group-item bg-transparent border-secondary py-3 px-4">
+            <div class="row align-items-center">
+              <div class="col-4 text-muted small">
+                <i class="bi bi-calendar-event me-1"></i>Data
+              </div>
+              <div class="col-8 fw-semibold">
+                {{ appt.scheduled_date.strftime('%d/%m/%Y') }}
+              </div>
+            </div>
+          </li>
+
+          <li class="list-group-item bg-transparent border-secondary py-3 px-4">
+            <div class="row align-items-center">
+              <div class="col-4 text-muted small">
+                <i class="bi bi-clock me-1"></i>Horário
+              </div>
+              <div class="col-8">
+                <span class="fw-semibold text-gold">{{ appt.scheduled_time.strftime('%H:%M') }}</span>
+                {% if appt.end_time_str %}
+                <span class="text-muted small ms-1">até {{ appt.end_time_str }}</span>
+                {% endif %}
+              </div>
+            </div>
+          </li>
+
+          {% if appt.notes %}
+          <li class="list-group-item bg-transparent border-secondary py-3 px-4">
+            <div class="row">
+              <div class="col-4 text-muted small">
+                <i class="bi bi-chat-left-text me-1"></i>Obs.
+              </div>
+              <div class="col-8 small text-muted">{{ appt.notes }}</div>
+            </div>
+          </li>
+          {% endif %}
+
+        </ul>
+      </div>
+    </div>
+
+    <!-- Créditos de assinatura utilizados -->
+    {% if credit_items %}
+    <div class="card card-dark mb-4">
+      <div class="card-header py-2">
+        <span class="text-gold fw-semibold small">
+          <i class="bi bi-award me-2"></i>Créditos de assinatura utilizados
+        </span>
+      </div>
+      <div class="card-body p-0">
+        <ul class="list-group list-group-flush">
+          {% for item in credit_items %}
+          <li class="list-group-item bg-transparent border-secondary py-3 px-4">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="fw-semibold small">{{ item.service_name }}</div>
+                <div class="text-muted" style="font-size:.72rem">{{ item.plan_name }}</div>
+              </div>
+              <div class="text-end">
+                <span class="text-gold fw-bold small">{{ item.remaining }}</span>
+                <span class="text-muted small">/{{ item.total }} restantes</span>
+              </div>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Aviso de pontualidade -->
+    <div class="alert alert-warning alert-sm d-flex gap-2 align-items-start py-2 px-3 mb-4" style="font-size:.82rem">
+      <i class="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0"></i>
+      <div>
+        Chegue com alguns minutos de antecedência. Caso precise cancelar,
+        <a href="{{ url_for('client.lookup') }}" class="alert-link">acesse seu portal</a>
+        ou entre em contato com a barbearia.
+      </div>
+    </div>
+
+    <!-- Ações -->
+    <div class="d-flex gap-2 justify-content-center flex-wrap">
+      <a href="{{ url_for('client.lookup') }}" class="btn btn-outline-secondary px-4">
+        <i class="bi bi-person-vcard me-2"></i>Meus agendamentos
+      </a>
+      <a href="{{ url_for('appointments.book') }}" class="btn btn-gold px-4 fw-bold">
+        <i class="bi bi-plus-circle me-2"></i>Novo agendamento
+      </a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.success-header { animation: fadeInDown .5s ease both; }
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.success-icon-wrap {
+  width: 80px; height: 80px;
+  background: rgba(74, 222, 128, .1);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.agendado-badge {
+  display: inline-block;
+  background: var(--gold);
+  color: #FFFFFF;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 6px 28px;
+  border-radius: 8px;
+  animation: popIn .4s cubic-bezier(.175,.885,.32,1.275) .15s both;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.7); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.card-dark { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; }
+.card-dark .card-header { background: var(--bg-elevated); border-bottom: 1px solid var(--border-subtle); border-radius: 12px 12px 0 0; }
+.list-group-item { color: var(--text-primary); }
+</style>
+{% endblock %}

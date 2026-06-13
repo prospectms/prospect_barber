@@ -1,0 +1,245 @@
+{% extends "base_public.html" %}
+{% block title %}Meus Agendamentos{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-7 col-lg-8">
+
+    <div class="text-center mb-4">
+      <h3 class="fw-bold mb-1">Portal do Cliente</h3>
+      <p class="text-muted small">Consulte e gerencie seus agendamentos informando seu CPF.</p>
+    </div>
+
+    <!-- ── Formulário CPF ──────────────────────────────────────────── -->
+    <div class="card card-dark mb-4">
+      <div class="card-body p-4">
+        <form method="POST" action="{{ url_for('client.lookup') }}" novalidate id="lookupForm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="row g-3 align-items-end">
+            <div class="col-md-5">
+              <label class="form-label fw-semibold small">
+                <i class="bi bi-person-vcard me-1 text-gold"></i>CPF
+              </label>
+              <input type="text" name="cpf" id="cpfInput"
+                     class="form-control bg-dark border-secondary text-light"
+                     placeholder="000.000.000-00"
+                     maxlength="14"
+                     value="{{ cpf_input or '' }}"
+                     autocomplete="off" />
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small">
+                <i class="bi bi-calendar-range me-1 text-gold"></i>De
+              </label>
+              <input type="date" name="date_from"
+                     class="form-control bg-dark border-secondary text-light"
+                     value="{{ date_from or '' }}" />
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold small">Até</label>
+              <input type="date" name="date_to"
+                     class="form-control bg-dark border-secondary text-light"
+                     value="{{ date_to or '' }}" />
+            </div>
+            <div class="col-md-2 d-grid">
+              <button type="submit" class="btn btn-gold fw-bold">
+                <i class="bi bi-search me-1"></i>Buscar
+              </button>
+            </div>
+          </div>
+          {% if cpf_input %}
+          <div class="mt-2 text-end">
+            <button type="submit" name="cpf" value="" class="btn btn-link btn-sm text-muted p-0">
+              <i class="bi bi-x-circle me-1"></i>Limpar busca
+            </button>
+          </div>
+          {% endif %}
+        </form>
+      </div>
+    </div>
+
+    <!-- ── Resultado ───────────────────────────────────────────────── -->
+    {% if customer %}
+
+    <!-- Info do cliente + assinatura -->
+    <div class="customer-banner mb-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="cust-avatar flex-shrink-0">{{ customer.initials }}</div>
+        <div class="flex-grow-1">
+          <div class="fw-bold">{{ customer.name }}</div>
+          <div class="text-muted small">{{ customer.cpf }}</div>
+        </div>
+        {% if subscription %}
+        <div class="text-end flex-shrink-0">
+          <span class="badge {{ subscription.status_badge }} me-1">
+            {{ subscription.status_label }}
+          </span>
+          <div class="text-muted small mt-1">
+            <i class="bi bi-award me-1 text-gold"></i>
+            {{ subscription.plan.name if subscription.plan else 'Assinatura' }}
+            {% if subscription.effective_status == 'active' and subscription.days_remaining <= 3 %}
+            · <span class="text-warning">{{ subscription.days_remaining }}d restantes</span>
+            {% elif subscription.effective_status == 'active' %}
+            · vence {{ subscription.end_date.strftime('%d/%m/%Y') }}
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Agendamentos -->
+    {% if appointments %}
+    <div class="d-flex flex-column gap-3">
+      {% for a in appointments %}
+      {% set is_past = a.scheduled_date < today %}
+      {% set can_act = a.status in ('pending', 'confirmed') and not is_past %}
+      <div class="appt-card {% if is_past %}appt-past{% endif %}">
+        <div class="d-flex align-items-start gap-3 flex-wrap">
+
+          <!-- Data/hora -->
+          <div class="appt-datetime text-center flex-shrink-0">
+            <div class="appt-day">{{ a.scheduled_date.strftime('%d') }}</div>
+            <div class="appt-month">{{ a.scheduled_date.strftime('%b').upper() }}</div>
+            <div class="appt-time">{{ a.scheduled_time.strftime('%H:%M') }}</div>
+          </div>
+
+          <!-- Detalhes -->
+          <div class="flex-grow-1">
+            <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+              <span class="fw-semibold small">
+                {{ a.kit.name if a.kit else (a.service.name if a.service else '—') }}
+              </span>
+              <span class="badge bg-{{ a.status_color }} badge-sm">{{ a.status_label }}</span>
+            </div>
+            <div class="text-muted small">
+              <i class="bi bi-person-badge me-1"></i>{{ a.barber.name if a.barber else '—' }}
+              {% if a.barber and a.barber.whatsapp_link %}
+              <a href="{{ a.barber.whatsapp_link }}" target="_blank" rel="noopener"
+                 class="ms-2 text-decoration-none" style="color:#25D366">
+                <i class="bi bi-whatsapp"></i>
+              </a>
+              {% endif %}
+            </div>
+            {% if a.end_time_str %}
+            <div class="text-muted" style="font-size:.72rem">
+              <i class="bi bi-clock me-1"></i>{{ a.scheduled_time.strftime('%H:%M') }} – {{ a.end_time_str }}
+            </div>
+            {% endif %}
+            {% if a.notes %}
+            <div class="text-muted fst-italic" style="font-size:.72rem">{{ a.notes }}</div>
+            {% endif %}
+          </div>
+
+          <!-- Ações -->
+          {% if can_act %}
+          <div class="appt-actions d-flex gap-1 flex-shrink-0">
+            {% if a.status == 'pending' %}
+            <form method="POST" action="{{ url_for('client.confirm_appointment', appt_id=a.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="cpf" value="{{ customer.cpf }}">
+              <button type="submit" class="btn btn-sm btn-outline-success"
+                      title="Confirmar presença">
+                <i class="bi bi-check-lg"></i>
+              </button>
+            </form>
+            {% endif %}
+            <a href="{{ url_for('client.reschedule_appointment', appt_id=a.id) }}"
+               class="btn btn-sm btn-outline-gold" title="Remarcar">
+              <i class="bi bi-calendar-plus"></i>
+            </a>
+            <form method="POST" action="{{ url_for('client.cancel_appointment', appt_id=a.id) }}"
+                  onsubmit="return confirm('Cancelar este agendamento?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="cpf" value="{{ customer.cpf }}">
+              <button type="submit" class="btn btn-sm btn-outline-danger" title="Cancelar">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </form>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-calendar-x d-block fs-2 mb-2 opacity-50"></i>
+      <div class="small">Nenhum agendamento encontrado{% if date_from or date_to %} no período selecionado{% endif %}.</div>
+      <a href="{{ url_for('appointments.book') }}" class="btn btn-gold btn-sm mt-3">
+        <i class="bi bi-plus-circle me-1"></i>Fazer um agendamento
+      </a>
+    </div>
+    {% endif %}
+
+    {% elif cpf_input %}
+    {# Flash já exibido pelo base_public; apenas botão de novo agendamento #}
+    <div class="text-center py-3">
+      <a href="{{ url_for('appointments.book') }}" class="btn btn-gold btn-sm">
+        <i class="bi bi-plus-circle me-1"></i>Fazer um agendamento
+      </a>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.customer-banner {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--gold);
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+.cust-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--gold);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 1rem; color: #FFFFFF;
+}
+.appt-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 16px 20px;
+  transition: border-color .15s;
+}
+.appt-card:hover { border-color: var(--border-medium); }
+.appt-past { opacity: .6; }
+.appt-datetime {
+  min-width: 52px;
+}
+.appt-day   { font-size: 1.5rem; font-weight: 800; line-height: 1; color: var(--gold); }
+.appt-month { font-size: .62rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: .08em; }
+.appt-time  { font-size: .78rem; color: var(--text-secondary); margin-top: 2px; }
+.appt-actions { align-self: center; }
+.badge-sm { font-size: .65rem; padding: 3px 7px; }
+.btn-outline-gold {
+  border-color: var(--gold); color: var(--gold);
+}
+.btn-outline-gold:hover { background: var(--gold); color: #FFFFFF; }
+.card-dark { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 12px; }
+.card-dark .card-body { }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Máscara CPF simples
+const cpfInput = document.getElementById('cpfInput');
+if (cpfInput) {
+  cpfInput.addEventListener('input', function () {
+    let v = this.value.replace(/\D/g, '').slice(0, 11);
+    if (v.length > 9) v = v.slice(0,3) + '.' + v.slice(3,6) + '.' + v.slice(6,9) + '-' + v.slice(9);
+    else if (v.length > 6) v = v.slice(0,3) + '.' + v.slice(3,6) + '.' + v.slice(6);
+    else if (v.length > 3) v = v.slice(0,3) + '.' + v.slice(3);
+    this.value = v;
+  });
+}
+</script>
+{% endblock %}

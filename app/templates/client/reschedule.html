@@ -1,0 +1,321 @@
+{% extends "base_public.html" %}
+{% block title %}Remarcar agendamento{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-6 col-lg-7 col-md-9">
+
+    <div class="text-center mb-4">
+      <h4 class="fw-bold mb-1">Remarcar agendamento</h4>
+      <p class="text-muted small">
+        {{ appt.service.name if appt.service else '—' }} com
+        {{ appt.barber.name if appt.barber else '—' }} —
+        {{ appt.scheduled_date.strftime('%d/%m/%Y') }} às {{ appt.scheduled_time.strftime('%H:%M') }}
+      </p>
+    </div>
+
+    <form method="POST"
+          action="{{ url_for('client.reschedule_appointment', appt_id=appt.id) }}"
+          novalidate id="rescheduleForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="cpf" value="{{ cpf }}">
+      <input type="hidden" name="scheduled_date" id="inpDate" value="{{ selected_date }}">
+      <input type="hidden" name="scheduled_time" id="inpTime" value="{{ selected_time }}">
+      <input type="hidden" name="barber_id" id="inpBarberId" value="{{ selected_barber_id or '' }}">
+
+      <!-- ── Passo 1: Barbeiro ─────────────────────────────────────── -->
+      <div class="step-card mb-3" id="step1">
+        <div class="step-header">
+          <div class="step-num">1</div>
+          <div>
+            <div class="step-title">Escolha o barbeiro</div>
+            <div id="lbl_barber" class="step-chosen"></div>
+          </div>
+        </div>
+        <div class="step-body" id="body_barber">
+          {% if barbers %}
+          <div class="row g-2 mt-1">
+            {% for b in barbers %}
+            <div class="col-6 col-md-4">
+              <div class="opt-card opt-card-barber"
+                   data-step="barber"
+                   data-id="{{ b.id }}"
+                   data-label="{{ b.name }}"
+                   {% if selected_barber_id == b.id %}data-preselected="1"{% endif %}>
+                {% if b.photo_url %}
+                <img src="{{ b.photo_url }}" class="barber-thumb mb-2" alt="{{ b.name }}">
+                {% else %}
+                <div class="barber-initials-sm mx-auto mb-2">{{ b.initials }}</div>
+                {% endif %}
+                <div class="opt-name">{{ b.name }}</div>
+                {% if b.specialty %}
+                <div class="opt-info">{{ b.specialty }}</div>
+                {% endif %}
+                {% if b.work_hours_str != '—' %}
+                <div class="opt-info"><i class="bi bi-clock me-1"></i>{{ b.work_hours_str }}</div>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted small mt-2">Nenhum barbeiro disponível.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ── Passo 2: Data ─────────────────────────────────────────── -->
+      <div class="step-card step-locked mb-3" id="step2">
+        <div class="step-header">
+          <div class="step-num">2</div>
+          <div>
+            <div class="step-title">Escolha a data</div>
+            <div id="lbl_date" class="step-chosen"></div>
+          </div>
+          <div class="step-lock-icon ms-auto"><i class="bi bi-lock-fill"></i></div>
+        </div>
+        <div class="step-body" id="body_date" style="display:none">
+          <div class="mt-3" style="max-width:220px">
+            <input type="date" id="datePickerInput"
+                   class="form-control bg-dark border-secondary text-light"
+                   min="{{ today.isoformat() }}"
+                   value="{{ selected_date or '' }}" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Passo 3: Horário ──────────────────────────────────────── -->
+      <div class="step-card step-locked mb-3" id="step3">
+        <div class="step-header">
+          <div class="step-num">3</div>
+          <div>
+            <div class="step-title">Escolha o horário</div>
+            <div id="lbl_time" class="step-chosen"></div>
+          </div>
+          <div class="step-lock-icon ms-auto"><i class="bi bi-lock-fill"></i></div>
+        </div>
+        <div class="step-body" id="body_time" style="display:none">
+          <div id="slots_loading" class="text-muted small mt-3" style="display:none">
+            <span class="spinner-border spinner-border-sm me-1"></span>Verificando disponibilidade...
+          </div>
+          <div id="slots_empty" class="text-warning small mt-3" style="display:none">
+            <i class="bi bi-exclamation-circle-fill me-1"></i>
+            Nenhum horário disponível nesta data. Tente outro dia.
+          </div>
+          <div id="slots_grid" class="d-flex flex-wrap gap-2 mt-3"></div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" id="btnConfirm"
+                class="btn btn-gold px-4 fw-bold" disabled>
+          <i class="bi bi-calendar-check-fill me-2"></i>Confirmar remarcação
+        </button>
+        <a href="{{ url_for('client.lookup') }}" class="btn btn-outline-secondary">
+          Cancelar
+        </a>
+      </div>
+    </form>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.step-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.step-card.step-locked { opacity: .5; pointer-events: none; }
+.step-card.step-done   { border-color: rgba(212,160,23,.35); }
+.step-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 20px;
+}
+.step-num {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--gold-soft); border: 1px solid var(--gold-border);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: .9rem; color: var(--gold);
+  flex-shrink: 0;
+}
+.step-card.step-done .step-num { background: var(--gold); color: #FFFFFF; }
+.step-title  { font-weight: 600; font-size: .95rem; }
+.step-chosen { font-size: .78rem; color: var(--gold); margin-top: 2px; }
+.step-lock-icon { color: var(--text-dim); font-size: .85rem; }
+.step-body { padding: 0 20px 20px; }
+.opt-card {
+  background: var(--bg-card);
+  border: 2px solid var(--border-subtle);
+  border-radius: 10px; padding: 14px 12px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, transform .15s;
+  text-align: center; height: 100%;
+}
+.opt-card:hover { border-color: var(--gold-border); background: var(--gold-soft); transform: translateY(-2px); }
+.opt-card.selected { border-color: var(--gold); background: var(--gold-soft); }
+.opt-name  { font-weight: 600; font-size: .9rem; margin-bottom: 4px; }
+.opt-info  { color: var(--text-muted); font-size: .72rem; margin-top: 4px; }
+.barber-thumb {
+  width: 56px; height: 56px; border-radius: 50%;
+  object-fit: cover; border: 2px solid var(--gold);
+  display: block; margin: 0 auto;
+}
+.barber-initials-sm {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--gold);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 1.1rem; color: #FFFFFF;
+}
+.slot-btn {
+  padding: 8px 18px; border-radius: 8px; font-size: .85rem; font-weight: 500;
+  border: 1px solid var(--gold-border); color: var(--gold);
+  background: transparent; cursor: pointer; transition: all .15s;
+}
+.slot-btn:hover { background: var(--gold-soft); border-color: var(--gold); }
+.slot-btn.selected { background: var(--gold); color: #FFFFFF; font-weight: 700; border-color: var(--gold); }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const state = { barberId: '', barberName: '', date: '', dateDisplay: '', time: '' };
+
+const inpBarberId = document.getElementById('inpBarberId');
+const inpDate     = document.getElementById('inpDate');
+const inpTime     = document.getElementById('inpTime');
+const btnConfirm  = document.getElementById('btnConfirm');
+
+function unlockStep(num) {
+  const el = document.getElementById('step' + num);
+  el.classList.remove('step-locked');
+  const body = el.querySelector('.step-body');
+  if (body) body.style.display = 'block';
+  const lock = el.querySelector('.step-lock-icon');
+  if (lock) lock.style.display = 'none';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function markDone(num, label) {
+  const el = document.getElementById('step' + num);
+  el.classList.add('step-done');
+  const ids = ['', 'lbl_barber', 'lbl_date', 'lbl_time'];
+  const lbl = document.getElementById(ids[num]);
+  if (lbl) lbl.textContent = label;
+}
+
+function updateConfirm() {
+  btnConfirm.disabled = !(state.barberId && state.date && state.time);
+}
+
+// Passo 1 — Barbeiro
+document.querySelectorAll('[data-step="barber"]').forEach(card => {
+  card.addEventListener('click', function () {
+    document.querySelectorAll('[data-step="barber"]').forEach(c => c.classList.remove('selected'));
+    this.classList.add('selected');
+    state.barberId   = this.dataset.id;
+    state.barberName = this.dataset.label;
+    inpBarberId.value = state.barberId;
+    markDone(1, state.barberName);
+    // reset steps 2+
+    state.date = ''; state.dateDisplay = ''; state.time = '';
+    inpDate.value = ''; inpTime.value = '';
+    document.getElementById('step2').classList.remove('step-done');
+    document.getElementById('lbl_date').textContent = '';
+    document.getElementById('step3').classList.remove('step-done');
+    document.getElementById('lbl_time').textContent = '';
+    document.getElementById('slots_grid').innerHTML = '';
+    document.getElementById('slots_empty').style.display = 'none';
+    unlockStep(2);
+    updateConfirm();
+  });
+});
+
+// Passo 2 — Data
+const datePicker = document.getElementById('datePickerInput');
+if (datePicker) {
+  datePicker.addEventListener('change', function () {
+    if (!this.value) return;
+    state.date = this.value;
+    inpDate.value = state.date;
+    const [y, m, d] = this.value.split('-');
+    state.dateDisplay = d + '/' + m + '/' + y;
+    markDone(2, state.dateDisplay);
+    state.time = ''; inpTime.value = '';
+    document.getElementById('step3').classList.remove('step-done');
+    document.getElementById('lbl_time').textContent = '';
+    document.getElementById('slots_grid').innerHTML = '';
+    document.getElementById('slots_empty').style.display = 'none';
+    unlockStep(3);
+    loadSlots();
+    updateConfirm();
+  });
+}
+
+// Passo 3 — Horários via AJAX
+function loadSlots() {
+  if (!state.barberId || !state.date) return;
+  const serviceId = {{ appt.service_id or 'null' }};
+  const kitId     = {{ appt.kit_id or 'null' }};
+  const excludeId = {{ appt.id }};
+
+  let url = `/client/slots?barber_id=${state.barberId}&date=${state.date}&exclude_id=${excludeId}`;
+  if (kitId)     url += '&kit_id=' + kitId;
+  else if (serviceId) url += '&service_id=' + serviceId;
+
+  const grid  = document.getElementById('slots_grid');
+  const spin  = document.getElementById('slots_loading');
+  const empty = document.getElementById('slots_empty');
+  grid.innerHTML = '';
+  spin.style.display = 'block';
+  empty.style.display = 'none';
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      spin.style.display = 'none';
+      if (!data.slots || !data.slots.length) { empty.style.display = 'block'; return; }
+      data.slots.forEach(slot => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'slot-btn' + (state.time === slot ? ' selected' : '');
+        btn.textContent = slot;
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
+          this.classList.add('selected');
+          state.time = slot;
+          inpTime.value = slot;
+          markDone(3, slot);
+          updateConfirm();
+        });
+        grid.appendChild(btn);
+      });
+    })
+    .catch(() => { spin.style.display = 'none'; empty.style.display = 'block'; });
+}
+
+// Restaurar estado da seleção prévia
+(function init() {
+  const preBar = document.querySelector('[data-step="barber"][data-preselected="1"]');
+  if (preBar) { preBar.click(); }
+
+  const preDate = '{{ selected_date }}';
+  if (preDate && datePicker) {
+    datePicker.value = preDate;
+    datePicker.dispatchEvent(new Event('change'));
+  }
+
+  const preTime = '{{ selected_time }}';
+  if (preTime) {
+    setTimeout(() => {
+      const btn = document.querySelector('.slot-btn');
+      // will be auto-selected by slot-btn creation
+    }, 500);
+  }
+})();
+</script>
+{% endblock %}

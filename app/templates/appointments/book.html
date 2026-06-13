@@ -1,0 +1,777 @@
+{% extends "base_public.html" %}
+{% block title %}Agendar{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+  <div class="col-lg-8 col-xl-7">
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- LANDING — tela inicial com duas opções                 -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="sec-landing">
+      <div class="text-center mb-5 pt-2">
+        <h3 class="fw-bold mb-1">Bem-vindo à Prospect Barber</h3>
+        <p class="text-muted small">O que deseja fazer?</p>
+      </div>
+      <div class="landing-wrap">
+        <div class="landing-card" id="landingAgendar" role="button" tabindex="0">
+          <div class="landing-card-icon"><i class="bi bi-calendar-plus"></i></div>
+          <div class="landing-card-title">Agendar Horário</div>
+          <div class="landing-card-desc">Escolha serviço, barbeiro, data e horário em poucos passos.</div>
+          <div class="landing-card-cta">Agendar agora <i class="bi bi-arrow-right ms-1"></i></div>
+        </div>
+        <div class="landing-sep">
+          <div class="sep-line"></div>
+          <div class="sep-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="1.5"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+              <line x1="20" y1="4" x2="8.12" y2="15.88"/>
+              <line x1="14.47" y1="14.48" x2="20" y2="20"/>
+              <line x1="8.12" y1="8.12" x2="12" y2="12"/>
+            </svg>
+          </div>
+          <div class="sep-line"></div>
+        </div>
+        <a href="{{ url_for('client.lookup') }}" class="landing-card text-decoration-none" tabindex="0">
+          <div class="landing-card-icon"><i class="bi bi-person-lines-fill"></i></div>
+          <div class="landing-card-title">Verificar Agendamento</div>
+          <div class="landing-card-desc">Consulte, confirme ou cancele seus horários pelo CPF, sem login.</div>
+          <div class="landing-card-cta">Consultar agora <i class="bi bi-arrow-right ms-1"></i></div>
+        </a>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- BOOKING — formulário step-by-step                      -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div id="sec-booking" style="display:none">
+
+      <button type="button" class="back-btn mb-4" id="backFromBooking">
+        <i class="bi bi-arrow-left me-2"></i>Voltar
+      </button>
+
+      <!-- Título -->
+      <div class="text-center mb-4">
+        <h3 class="fw-bold mb-1">Agendar horário</h3>
+        <p class="text-muted small">Siga os passos abaixo para garantir seu horário.</p>
+      </div>
+
+    <form method="POST" action="{{ url_for('appointments.book') }}" novalidate id="bookForm">
+      {{ form.hidden_tag() }}
+      <!-- Os HiddenFields service_id, barber_id, scheduled_date, scheduled_time
+           já são renderizados acima pelo hidden_tag() com ids padrão do WTForms.
+           O JS preenche diretamente esses inputs. -->
+
+      <!-- hidden fields for kit_id preenchido pelo JS -->
+      {{ form.kit_id(id="kit_id") }}
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <!-- PASSO 1 — Serviço ou Kit                           -->
+      <!-- ══════════════════════════════════════════════════ -->
+      <div class="step-card mb-3" id="step1">
+        <div class="step-header">
+          <div class="step-num">1</div>
+          <div>
+            <div class="step-title">Escolha o serviço</div>
+            <div id="lbl_service" class="step-chosen"></div>
+          </div>
+        </div>
+        <div class="step-body" id="body_service">
+
+          {% if kits %}
+          <!-- Tabs: Serviço / Kit -->
+          <ul class="nav nav-pills gap-1 mb-3 mt-1" id="bookServiceTab">
+            <li class="nav-item">
+              <button class="nav-link px-3 py-1 small" id="btnTabSvc" type="button"
+                      data-tab="service">
+                <i class="bi bi-scissors me-1"></i>Serviço
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link active px-3 py-1 small" id="btnTabKit" type="button"
+                      data-tab="kit">
+                <i class="bi bi-collection me-1"></i>Kit
+              </button>
+            </li>
+          </ul>
+          {% endif %}
+
+          <!-- Painel Serviço -->
+          <div id="bookPanelService" {% if kits %}style="display:none"{% endif %}>
+            {% if services %}
+            <div class="row g-2">
+              {% for s in services %}
+              <div class="col-6 col-md-4">
+                <div class="opt-card"
+                     data-step="service"
+                     data-id="{{ s.id }}"
+                     data-label="{{ s.name }}"
+                     data-duration="{{ s.duration_minutes }}"
+                     data-price="{{ s.price_formatted }}">
+                  <div class="opt-name">{{ s.name }}</div>
+                  <div class="opt-price">{{ s.price_formatted }}</div>
+                  <div class="opt-info"><i class="bi bi-clock me-1"></i>{{ s.duration_formatted }}</div>
+                  {% if s.description %}<div class="opt-desc">{{ s.description | truncate(45) }}</div>{% endif %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-muted small">Nenhum serviço disponível no momento.</p>
+            {% endif %}
+          </div>
+
+          <!-- Painel Kit -->
+          {% if kits %}
+          <div id="bookPanelKit">
+            <div class="row g-2">
+              {% for k in kits %}
+              <div class="col-6 col-md-4">
+                <div class="opt-card"
+                     data-step="kit"
+                     data-id="{{ k.id }}"
+                     data-label="{{ k.name }}"
+                     data-duration="{{ k.total_duration_minutes }}"
+                     data-price="{{ k.price_formatted }}">
+                  <div class="opt-name">{{ k.name }}</div>
+                  <div class="opt-price">{{ k.price_formatted }}</div>
+                  <div class="opt-info"><i class="bi bi-clock me-1"></i>{{ k.duration_formatted }}</div>
+                  <div class="opt-desc">{{ k.services_summary }}</div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <!-- PASSO 2 — Barbeiro                                 -->
+      <!-- ══════════════════════════════════════════════════ -->
+      <div class="step-card step-locked mb-3" id="step2">
+        <div class="step-header">
+          <div class="step-num">2</div>
+          <div>
+            <div class="step-title">Escolha o barbeiro</div>
+            <div id="lbl_barber" class="step-chosen"></div>
+          </div>
+          <div class="step-lock-icon ms-auto"><i class="bi bi-lock-fill"></i></div>
+        </div>
+        <div class="step-body" id="body_barber" style="display:none">
+          {% if barbers %}
+          <div class="row g-2 mt-1">
+            {% for b in barbers %}
+            <div class="col-6 col-md-4">
+              <div class="opt-card opt-card-barber"
+                   data-step="barber"
+                   data-id="{{ b.id }}"
+                   data-label="{{ b.name }}">
+                {% if b.photo_url %}
+                <img src="{{ b.photo_url }}" class="barber-thumb mb-2" alt="{{ b.name }}">
+                {% else %}
+                <div class="barber-initials-sm mx-auto mb-2">{{ b.initials }}</div>
+                {% endif %}
+                <div class="opt-name">{{ b.name }}</div>
+                {% if b.specialty %}
+                <div class="opt-info">{{ b.specialty }}</div>
+                {% endif %}
+                {% if b.work_hours_str != '—' %}
+                <div class="opt-info"><i class="bi bi-clock me-1"></i>{{ b.work_hours_str }}</div>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted small mt-2">Nenhum barbeiro disponível no momento.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <!-- PASSO 3 — Data                                     -->
+      <!-- ══════════════════════════════════════════════════ -->
+      <div class="step-card step-locked mb-3" id="step3">
+        <div class="step-header">
+          <div class="step-num">3</div>
+          <div>
+            <div class="step-title">Escolha a data</div>
+            <div id="lbl_date" class="step-chosen"></div>
+          </div>
+          <div class="step-lock-icon ms-auto"><i class="bi bi-lock-fill"></i></div>
+        </div>
+        <div class="step-body" id="body_date" style="display:none">
+          <div class="mt-3" style="max-width:220px">
+            <input type="date" id="datePickerInput"
+                   class="form-control bg-dark border-secondary text-light"
+                   min="{{ now.strftime('%Y-%m-%d') }}" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <!-- PASSO 4 — Horário                                  -->
+      <!-- ══════════════════════════════════════════════════ -->
+      <div class="step-card step-locked mb-3" id="step4">
+        <div class="step-header">
+          <div class="step-num">4</div>
+          <div>
+            <div class="step-title">Escolha o horário</div>
+            <div id="lbl_time" class="step-chosen"></div>
+          </div>
+          <div class="step-lock-icon ms-auto"><i class="bi bi-lock-fill"></i></div>
+        </div>
+        <div class="step-body" id="body_time" style="display:none">
+          <div id="slots_loading" class="text-muted small mt-3" style="display:none">
+            <span class="spinner-border spinner-border-sm me-1"></span>Verificando disponibilidade...
+          </div>
+          <div id="slots_empty" class="text-warning small mt-3" style="display:none">
+            <i class="bi bi-exclamation-circle-fill me-1"></i>
+            Nenhum horário disponível nesta data. Tente outro dia.
+          </div>
+          <div id="slots_grid" class="d-flex flex-wrap gap-2 mt-3"></div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <!-- PASSO 5 — Seus dados                               -->
+      <!-- ══════════════════════════════════════════════════ -->
+      <div class="step-card step-locked mb-3" id="step5">
+        <div class="step-header">
+          <div class="step-num">5</div>
+          <div class="step-title">Seus dados</div>
+          <div class="step-lock-icon ms-auto"><i class="bi bi-lock-fill"></i></div>
+        </div>
+        <div class="step-body" id="body_contact" style="display:none">
+          <div class="row g-3 mt-1">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">
+                {{ form.customer_name.label.text }} <span class="text-danger">*</span>
+              </label>
+              {{ form.customer_name(
+                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.customer_name.errors else ""),
+                  placeholder="Seu nome completo",
+                  id="inp_name",
+                  autocomplete="name"
+              ) }}
+              {% for e in form.customer_name.errors %}
+              <div class="invalid-feedback">{{ e }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">
+                {{ form.customer_phone.label.text }} <span class="text-danger">*</span>
+              </label>
+              <div class="input-group">
+                <span class="input-group-text bg-dark border-secondary text-muted">
+                  <i class="bi bi-telephone"></i>
+                </span>
+                {{ form.customer_phone(
+                    class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.customer_phone.errors else ""),
+                    placeholder="(00) 00000-0000",
+                    id="inp_phone",
+                    autocomplete="tel"
+                ) }}
+                {% if form.customer_phone.errors %}
+                  {% for e in form.customer_phone.errors %}
+                  <div class="invalid-feedback">{{ e }}</div>
+                  {% endfor %}
+                {% endif %}
+              </div>
+              <div class="form-text">Usado para identificar seu cadastro.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">
+                {{ form.customer_cpf.label.text }}
+              </label>
+              {{ form.customer_cpf(
+                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.customer_cpf.errors else ""),
+                  placeholder="000.000.000-00",
+                  id="inp_cpf",
+                  maxlength=14,
+                  autocomplete="off"
+              ) }}
+              {% for e in form.customer_cpf.errors %}
+              <div class="invalid-feedback">{{ e }}</div>
+              {% endfor %}
+              <div class="form-text">Informe para acompanhar seus agendamentos no portal.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold small">
+                {{ form.notes.label.text }}
+              </label>
+              {{ form.notes(
+                  class="form-control bg-dark border-secondary text-light",
+                  rows=2,
+                  placeholder="Alguma preferência ou informação adicional? (opcional)"
+              ) }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════ -->
+      <!-- Resumo + Confirmar                                 -->
+      <!-- ══════════════════════════════════════════════════ -->
+      <div class="summary-card mb-4" id="summaryCard" style="display:none">
+        <div class="summary-title">
+          <i class="bi bi-clipboard-check-fill text-gold me-2"></i>Resumo do agendamento
+        </div>
+        <div class="summary-grid">
+          <span class="text-muted">Serviço</span><span id="sum_service">—</span>
+          <span class="text-muted">Barbeiro</span><span id="sum_barber">—</span>
+          <span class="text-muted">Data</span><span id="sum_date">—</span>
+          <span class="text-muted">Horário</span><span id="sum_time">—</span>
+        </div>
+      </div>
+
+      <button type="submit" id="btnConfirm"
+              class="btn btn-gold w-100 py-3 fw-bold fs-5" disabled>
+        <i class="bi bi-calendar-check-fill me-2"></i>Confirmar agendamento
+      </button>
+
+    </form>
+    </div><!-- /sec-booking -->
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Landing ──────────────────────────────────────────── */
+.landing-wrap {
+  display: flex; gap: 20px; align-items: stretch;
+}
+.landing-card {
+  flex: 1; background: var(--bg-card);
+  border: 1.5px solid var(--border-medium);
+  border-radius: 14px; padding: 32px 24px;
+  text-align: center; cursor: pointer;
+  transition: border-color .15s, transform .15s, box-shadow .15s;
+  color: var(--text-primary);
+}
+.landing-card:hover {
+  border-color: var(--gold); transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(91,124,153,.12);
+}
+.landing-card-icon {
+  font-size: 2.5rem; color: var(--gold); margin-bottom: 16px;
+}
+.landing-card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+.landing-card-desc  { font-size: .82rem; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5; }
+.landing-card-cta   { font-size: .83rem; font-weight: 600; color: var(--gold); }
+.landing-sep {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px; padding: 24px 0; color: var(--text-muted); flex-shrink: 0;
+}
+.sep-line { flex: 1; width: 1px; background: var(--border-medium); }
+.sep-icon { color: var(--text-muted); }
+@media (max-width: 576px) {
+  .landing-wrap { flex-direction: column; }
+  .landing-sep  { flex-direction: row; padding: 0; height: 24px; }
+  .sep-line     { flex: 1; height: 1px; width: auto; }
+}
+.back-btn {
+  background: none; border: none; padding: 0;
+  color: var(--text-secondary); font-size: .88rem; cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+}
+.back-btn:hover { color: var(--gold); }
+
+/* ── Wizard steps ─────────────────────────────────────── */
+.step-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color .2s;
+}
+.step-card.step-locked { opacity: .5; pointer-events: none; }
+.step-card.step-done   { border-color: rgba(212,160,23,.35); }
+
+.step-header {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 20px;
+  cursor: default;
+}
+.step-num {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--gold-soft); border: 1px solid var(--gold-border);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: .9rem; color: var(--gold);
+  flex-shrink: 0;
+}
+.step-card.step-done .step-num {
+  background: var(--gold); color: #FFFFFF;
+}
+.step-title  { font-weight: 600; font-size: .95rem; }
+.step-chosen { font-size: .78rem; color: var(--gold); margin-top: 2px; }
+.step-lock-icon { color: var(--text-dim); font-size: .85rem; }
+.step-body { padding: 0 20px 20px; }
+
+/* ── Option cards ─────────────────────────────────────── */
+.opt-card {
+  background: var(--bg-card);
+  border: 2px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 14px 12px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, transform .15s;
+  text-align: center;
+  height: 100%;
+}
+.opt-card:hover { border-color: var(--gold-border); background: var(--gold-soft); transform: translateY(-2px); }
+.opt-card.selected { border-color: var(--gold); background: var(--gold-soft); }
+.opt-name  { font-weight: 600; font-size: .9rem; margin-bottom: 4px; }
+.opt-price { color: var(--gold); font-weight: 700; font-size: 1rem; }
+.opt-info  { color: var(--text-muted); font-size: .72rem; margin-top: 4px; }
+.opt-desc  { color: var(--text-muted); font-size: .68rem; margin-top: 4px; }
+
+/* ── Barber thumbs ────────────────────────────────────── */
+.barber-thumb {
+  width: 56px; height: 56px; border-radius: 50%;
+  object-fit: cover; border: 2px solid var(--gold);
+  display: block; margin: 0 auto;
+}
+.barber-initials-sm {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--gold);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 1.1rem; color: #FFFFFF;
+}
+
+/* ── Slot buttons ─────────────────────────────────────── */
+.slot-btn {
+  padding: 8px 18px; border-radius: 8px; font-size: .85rem; font-weight: 500;
+  border: 1px solid var(--gold-border); color: var(--gold);
+  background: transparent; cursor: pointer; transition: all .15s;
+}
+.slot-btn:hover { background: var(--gold-soft); border-color: var(--gold); }
+.slot-btn.selected { background: var(--gold); color: #FFFFFF; font-weight: 700; border-color: var(--gold); }
+
+/* ── Summary ──────────────────────────────────────────── */
+.summary-card {
+  background: var(--gold-soft);
+  border: 1px solid var(--gold-border);
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+.summary-title { font-weight: 700; font-size: .9rem; margin-bottom: 14px; }
+.summary-grid {
+  display: grid; grid-template-columns: 110px 1fr; gap: 8px 16px;
+  font-size: .875rem;
+}
+.summary-grid span { padding: 2px 0; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Landing navigation ───────────────────────────────────
+const secLanding = document.getElementById('sec-landing');
+const secBooking = document.getElementById('sec-booking');
+function showBooking() {
+  secLanding.style.display = 'none';
+  secBooking.style.display = 'block';
+  history.replaceState(null, '', '#agendar');
+}
+function showLanding() {
+  secBooking.style.display = 'none';
+  secLanding.style.display = 'block';
+  history.replaceState(null, '', '');
+}
+document.getElementById('landingAgendar').addEventListener('click', showBooking);
+document.getElementById('landingAgendar').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') showBooking(); });
+document.getElementById('backFromBooking').addEventListener('click', showLanding);
+// If URL already has #agendar (e.g. back navigation), show booking directly
+if (location.hash === '#agendar') showBooking();
+
+// ── Estado do wizard ─────────────────────────────────────
+const state = {
+  serviceId: '', kitId: '', mode: 'kit',  // 'service' ou 'kit'
+  serviceName: '', serviceDuration: 0, servicePrice: '',
+  barberId: '', barberName: '',
+  date: '', dateDisplay: '',
+  time: '',
+};
+
+// ── Referências DOM ──────────────────────────────────────
+const $ = id => document.getElementById(id);
+const inpService = $('service_id');
+const inpKitId   = $('kit_id');
+const inpBarber  = $('barber_id');
+const inpDate    = $('scheduled_date');
+const inpTime    = $('scheduled_time');
+
+// ── Utilitários ──────────────────────────────────────────
+function unlockStep(num) {
+  const el = $(`step${num}`);
+  el.classList.remove('step-locked');
+  const body = el.querySelector('.step-body');
+  if (body) body.style.display = 'block';
+  const lockIcon = el.querySelector('.step-lock-icon');
+  if (lockIcon) lockIcon.style.display = 'none';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function markDone(num, label) {
+  const el = $(`step${num}`);
+  el.classList.add('step-done');
+  const lbl = $(`lbl_${['','service','barber','date','time'][num]}`);
+  if (lbl) lbl.textContent = label;
+}
+
+function resetFrom(fromNum) {
+  // Reset steps fromNum onwards
+  if (fromNum <= 2) {
+    state.barberId = ''; state.barberName = '';
+    inpBarber.value = '';
+    document.querySelectorAll('[data-step="barber"]').forEach(c => c.classList.remove('selected'));
+    $('step2').classList.remove('step-done'); $('lbl_barber').textContent = '';
+    resetFrom(3);
+  }
+  if (fromNum <= 3) {
+    state.date = ''; state.dateDisplay = '';
+    inpDate.value = '';
+    const dp = $('datePickerInput'); if (dp) dp.value = '';
+    $('step3').classList.remove('step-done'); $('lbl_date').textContent = '';
+    resetFrom(4);
+  }
+  if (fromNum <= 4) {
+    state.time = '';
+    inpTime.value = '';
+    $('slots_grid').innerHTML = '';
+    $('slots_empty').style.display = 'none';
+    $('step4').classList.remove('step-done'); $('lbl_time').textContent = '';
+    resetFrom(5);
+  }
+  if (fromNum <= 5) {
+    updateSummary();
+    updateConfirmBtn();
+  }
+}
+
+// ── Tabs Serviço / Kit ──────────────────────────────────
+const tabBtns  = document.querySelectorAll('#bookServiceTab .nav-link');
+const panelSvc = document.getElementById('bookPanelService');
+const panelKit = document.getElementById('bookPanelKit');
+
+if (tabBtns.length) {
+  tabBtns.forEach(btn => {
+    btn.addEventListener('click', function () {
+      tabBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      const mode = this.dataset.tab;
+      state.mode = mode;
+      if (panelSvc) panelSvc.style.display = mode === 'service' ? '' : 'none';
+      if (panelKit) panelKit.style.display = mode === 'kit'     ? '' : 'none';
+      // reset step 1 selection
+      document.querySelectorAll('[data-step="service"],[data-step="kit"]')
+              .forEach(c => c.classList.remove('selected'));
+      state.serviceId = ''; state.kitId = '';
+      if (inpService) inpService.value = '';
+      if (inpKitId)   inpKitId.value   = '';
+      $('step1').classList.remove('step-done');
+      $('lbl_service').textContent = '';
+      resetFrom(2);
+    });
+  });
+  // set initial mode
+  const activeTab = document.querySelector('#bookServiceTab .nav-link.active');
+  state.mode = activeTab ? activeTab.dataset.tab : 'service';
+}
+
+// ── Passo 1: Serviço ─────────────────────────────────────
+document.querySelectorAll('[data-step="service"]').forEach(card => {
+  card.addEventListener('click', function () {
+    document.querySelectorAll('[data-step="service"],[data-step="kit"]').forEach(c => c.classList.remove('selected'));
+    this.classList.add('selected');
+    const changed = state.serviceId !== this.dataset.id;
+    state.serviceId = this.dataset.id;
+    state.kitId = '';
+    state.serviceName = this.dataset.label;
+    state.serviceDuration = parseInt(this.dataset.duration, 10);
+    state.servicePrice = this.dataset.price;
+    if (inpService) inpService.value = state.serviceId;
+    if (inpKitId)   inpKitId.value   = '';
+    markDone(1, `${state.serviceName} — ${state.servicePrice}`);
+    if (changed) resetFrom(2);
+    unlockStep(2);
+  });
+});
+
+// ── Passo 1: Kit ─────────────────────────────────────────
+document.querySelectorAll('[data-step="kit"]').forEach(card => {
+  card.addEventListener('click', function () {
+    document.querySelectorAll('[data-step="service"],[data-step="kit"]').forEach(c => c.classList.remove('selected'));
+    this.classList.add('selected');
+    const changed = state.kitId !== this.dataset.id;
+    state.kitId = this.dataset.id;
+    state.serviceId = '';
+    state.serviceName = this.dataset.label;
+    state.serviceDuration = parseInt(this.dataset.duration, 10);
+    state.servicePrice = this.dataset.price;
+    if (inpService) inpService.value = '';
+    if (inpKitId)   inpKitId.value   = state.kitId;
+    markDone(1, `${state.serviceName} — ${state.servicePrice}`);
+    if (changed) resetFrom(2);
+    unlockStep(2);
+  });
+});
+
+// ── Passo 2: Barbeiro ────────────────────────────────────
+document.querySelectorAll('[data-step="barber"]').forEach(card => {
+  card.addEventListener('click', function () {
+    document.querySelectorAll('[data-step="barber"]').forEach(c => c.classList.remove('selected'));
+    this.classList.add('selected');
+    const changed = state.barberId !== this.dataset.id;
+    state.barberId = this.dataset.id;
+    state.barberName = this.dataset.label;
+    inpBarber.value = state.barberId;
+    markDone(2, state.barberName);
+    if (changed) resetFrom(3);
+    unlockStep(3);
+  });
+});
+
+// ── Passo 3: Data ────────────────────────────────────────
+const datePicker = $('datePickerInput');
+if (datePicker) {
+  datePicker.addEventListener('change', function () {
+    if (!this.value) return;
+    state.date = this.value;
+    inpDate.value = state.date;
+    // Display date in pt-BR format
+    const [y, m, d] = this.value.split('-');
+    state.dateDisplay = `${d}/${m}/${y}`;
+    markDone(3, state.dateDisplay);
+    resetFrom(4);
+    unlockStep(4);
+    loadSlots();
+  });
+}
+
+// ── Passo 4: Horários via AJAX ───────────────────────────
+function loadSlots() {
+  if (!state.barberId || !state.serviceId || !state.date) return;
+  const grid  = $('slots_grid');
+  const spin  = $('slots_loading');
+  const empty = $('slots_empty');
+  grid.innerHTML = '';
+  spin.style.display = 'block';
+  empty.style.display = 'none';
+
+  let slotsUrl = `/appointments/slots?barber_id=${state.barberId}&date=${state.date}`;
+  if (state.kitId)     slotsUrl += `&kit_id=${state.kitId}`;
+  else if (state.serviceId) slotsUrl += `&service_id=${state.serviceId}`;
+
+  fetch(slotsUrl)
+    .then(r => r.json())
+    .then(data => {
+      spin.style.display = 'none';
+      if (!data.slots || data.slots.length === 0) {
+        empty.style.display = 'block'; return;
+      }
+      data.slots.forEach(slot => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'slot-btn';
+        btn.textContent = slot;
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
+          this.classList.add('selected');
+          state.time = slot;
+          inpTime.value = slot;
+          markDone(4, slot);
+          unlockStep(5);
+          updateSummary();
+          updateConfirmBtn();
+        });
+        grid.appendChild(btn);
+      });
+    })
+    .catch(() => {
+      spin.style.display = 'none';
+      empty.style.display = 'block';
+    });
+}
+
+// ── Resumo e botão de confirmar ──────────────────────────
+function updateSummary() {
+  if (!state.serviceId) { $('summaryCard').style.display = 'none'; return; }
+  $('sum_service').textContent = state.serviceName + (state.servicePrice ? ` — ${state.servicePrice}` : '');
+  $('sum_barber').textContent  = state.barberName || '—';
+  $('sum_date').textContent    = state.dateDisplay || '—';
+  $('sum_time').textContent    = state.time || '—';
+  $('summaryCard').style.display = 'block';
+}
+
+function updateConfirmBtn() {
+  const nameOk  = ($('inp_name')  || {value:''}).value.trim().length >= 2;
+  const phoneOk = ($('inp_phone') || {value:''}).value.trim().length >= 5;
+  const svcSet  = state.serviceId || state.kitId;
+  const allSet  = svcSet && state.barberId && state.date && state.time && nameOk && phoneOk;
+  $('btnConfirm').disabled = !allSet;
+}
+
+['inp_name', 'inp_phone'].forEach(id => {
+  const el = $(id);
+  if (el) el.addEventListener('input', updateConfirmBtn);
+});
+
+// ── Máscara CPF ──────────────────────────────────────────
+const cpfEl = $('inp_cpf');
+if (cpfEl) {
+  cpfEl.addEventListener('input', function () {
+    let v = this.value.replace(/\D/g, '').slice(0, 11);
+    if (v.length > 9) v = v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6,9)+'-'+v.slice(9);
+    else if (v.length > 6) v = v.slice(0,3)+'.'+v.slice(3,6)+'.'+v.slice(6);
+    else if (v.length > 3) v = v.slice(0,3)+'.'+v.slice(3);
+    this.value = v;
+  });
+}
+
+// Loading state no submit — evita double-submit e dá feedback imediato
+document.getElementById('bookForm').addEventListener('submit', function () {
+  const btn = $('btnConfirm');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Agendando...';
+});
+
+// ── Restaurar estado se form foi resubmetido com erros ───
+(function initFromPostData() {
+  const kitIdVal = inpKitId ? inpKitId.value : '';
+  const svcId    = inpService ? inpService.value : '';
+
+  if (kitIdVal) {
+    const kitTab = document.getElementById('btnTabKit');
+    if (kitTab) kitTab.click();
+    const card = document.querySelector(`[data-step="kit"][data-id="${kitIdVal}"]`);
+    if (card) card.click();
+  } else if (svcId) {
+    const svcTab = document.getElementById('btnTabSvc');
+    if (svcTab) svcTab.click();
+    const card = document.querySelector(`[data-step="service"][data-id="${svcId}"]`);
+    if (card) card.click();
+  }
+
+  const bId = inpBarber ? inpBarber.value : '';
+  if (bId) {
+    const card = document.querySelector(`[data-step="barber"][data-id="${bId}"]`);
+    if (card) card.click();
+  }
+  const dVal = inpDate ? inpDate.value : '';
+  if (dVal && datePicker) {
+    datePicker.value = dVal;
+    datePicker.dispatchEvent(new Event('change'));
+  }
+})();
+</script>
+{% endblock %}
