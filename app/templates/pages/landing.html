@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prospect Barber — Sistema de Gestão para Barbearias</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+
+  <style>
+    /* ── Reset / base ──────────────────────────────────────── */
+    body { background: var(--bg-body); color: var(--text-primary); }
+
+    /* ── Topbar ────────────────────────────────────────────── */
+    .lp-topbar {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 14px 0;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .lp-brand {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.2rem; font-weight: 700; letter-spacing: .4px;
+      color: var(--text-primary); text-decoration: none;
+    }
+    .lp-brand span { color: var(--gold); }
+
+    /* ── Hero ──────────────────────────────────────────────── */
+    .lp-hero {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 72px 0 64px;
+      text-align: center;
+    }
+    .lp-hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--gold-soft); border: 1px solid var(--gold-border);
+      border-radius: 20px; padding: 4px 14px;
+      font-size: .72rem; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--gold);
+      margin-bottom: 20px;
+    }
+    .lp-hero h1 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 700; line-height: 1.2;
+      color: var(--text-primary);
+      max-width: 680px; margin: 0 auto 16px;
+    }
+    .lp-hero h1 em { font-style: italic; color: var(--gold); }
+    .lp-hero-sub {
+      font-family: 'Lora', Georgia, serif;
+      font-size: 1.05rem; color: var(--text-secondary);
+      max-width: 520px; margin: 0 auto 36px; line-height: 1.65;
+    }
+    .lp-cta-wrap { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn-lp-wa {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #25D366; color: #FFFFFF;
+      border: none; border-radius: 8px;
+      padding: 12px 24px; font-weight: 700; font-size: .95rem;
+      text-decoration: none; transition: background .15s, transform .12s;
+    }
+    .btn-lp-wa:hover { background: #1ebe5a; color: #FFFFFF; transform: translateY(-2px); }
+    .btn-lp-demo {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: transparent; color: var(--gold);
+      border: 2px solid var(--gold); border-radius: 8px;
+      padding: 11px 24px; font-weight: 700; font-size: .95rem;
+      text-decoration: none; transition: background .15s, color .15s, transform .12s;
+    }
+    .btn-lp-demo:hover {
+      background: var(--gold); color: #FFFFFF; transform: translateY(-2px);
+    }
+
+    /* ── Sections ──────────────────────────────────────────── */
+    .lp-section { padding: 64px 0; }
+    .lp-section-alt { background: var(--bg-card); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+    .lp-section-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: clamp(1.35rem, 3vw, 1.85rem);
+      font-weight: 700; color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+    .lp-section-sub {
+      font-family: 'Lora', Georgia, serif;
+      font-size: .95rem; color: var(--text-secondary); line-height: 1.6;
+    }
+
+    /* ── Problema ──────────────────────────────────────────── */
+    .lp-problem-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-left: 4px solid var(--gold);
+      border-radius: 12px;
+      padding: 32px 36px;
+      max-width: 760px; margin: 0 auto;
+    }
+    .lp-problem-card p {
+      font-family: 'Lora', Georgia, serif;
+      font-size: 1rem; line-height: 1.75; color: var(--text-secondary);
+      margin-bottom: 0;
+    }
+    .lp-problem-card p + p { margin-top: 14px; }
+    .lp-problem-card strong { color: var(--text-primary); }
+
+    /* ── Feature cards ─────────────────────────────────────── */
+    .lp-feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 24px 20px;
+      height: 100%;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .lp-feature-card:hover {
+      border-color: var(--gold-border);
+      box-shadow: 0 4px 16px rgba(63,94,120,.10);
+    }
+    .lp-feature-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: var(--gold-soft); border: 1px solid var(--gold-border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; color: var(--gold);
+      margin-bottom: 14px;
+    }
+    .lp-feature-title {
+      font-weight: 700; font-size: .95rem;
+      color: var(--text-primary); margin-bottom: 6px;
+    }
+    .lp-feature-desc {
+      font-family: 'Lora', Georgia, serif;
+      font-size: .82rem; color: var(--text-muted); line-height: 1.55;
+      margin: 0;
+    }
+    .lp-check { color: var(--sage); font-size: .9rem; margin-right: 6px; flex-shrink: 0; }
+
+    /* ── Steps ─────────────────────────────────────────────── */
+    .lp-step {
+      display: flex; gap: 20px; align-items: flex-start;
+      padding: 20px 0;
+    }
+    .lp-step + .lp-step { border-top: 1px solid var(--border-subtle); }
+    .lp-step-num {
+      width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+      background: var(--gold); color: #FFFFFF;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 1rem;
+      box-shadow: 0 2px 8px rgba(63,94,120,.25);
+    }
+    .lp-step-title {
+      font-weight: 700; font-size: .97rem;
+      color: var(--text-primary); margin-bottom: 4px;
+    }
+    .lp-step-desc {
+      font-family: 'Lora', Georgia, serif;
+      font-size: .85rem; color: var(--text-secondary); line-height: 1.55;
+      margin: 0;
+    }
+
+    /* ── CTA final ─────────────────────────────────────────── */
+    .lp-cta-section {
+      background: var(--gold);
+      padding: 64px 0;
+      text-align: center;
+    }
+    .lp-cta-section h2 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      font-weight: 700; color: #FFFFFF;
+      margin-bottom: 10px;
+    }
+    .lp-cta-section p {
+      color: rgba(255,255,255,.82);
+      font-family: 'Lora', Georgia, serif;
+      font-size: .97rem; margin-bottom: 32px;
+    }
+    .btn-lp-wa-inv {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #FFFFFF; color: #1A7840;
+      border: none; border-radius: 8px;
+      padding: 12px 24px; font-weight: 700; font-size: .95rem;
+      text-decoration: none; transition: background .15s, transform .12s;
+    }
+    .btn-lp-wa-inv:hover { background: #f0fff4; color: #1A7840; transform: translateY(-2px); }
+    .btn-lp-demo-inv {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: transparent; color: #FFFFFF;
+      border: 2px solid rgba(255,255,255,.6); border-radius: 8px;
+      padding: 11px 24px; font-weight: 700; font-size: .95rem;
+      text-decoration: none; transition: border-color .15s, background .15s, transform .12s;
+    }
+    .btn-lp-demo-inv:hover {
+      border-color: #FFFFFF; background: rgba(255,255,255,.12);
+      color: #FFFFFF; transform: translateY(-2px);
+    }
+
+    /* ── Footer ────────────────────────────────────────────── */
+    .lp-footer {
+      background: var(--bg-card);
+      border-top: 1px solid var(--border-subtle);
+      padding: 20px 0;
+      text-align: center;
+      font-size: .78rem;
+      color: var(--text-muted);
+    }
+    .lp-footer a { color: var(--gold); text-decoration: none; }
+    .lp-footer a:hover { text-decoration: underline; }
+
+    /* ── Responsive ────────────────────────────────────────── */
+    @media (max-width: 576px) {
+      .lp-hero { padding: 48px 0 40px; }
+      .lp-problem-card { padding: 24px 20px; }
+      .lp-section { padding: 48px 0; }
+      .lp-cta-section { padding: 48px 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Topbar ──────────────────────────────────────────────── -->
+<header class="lp-topbar">
+  <div class="container">
+    <div class="d-flex align-items-center justify-content-between gap-3">
+      <a href="{{ url_for('pages.sobre') }}" class="lp-brand">
+        <i class="bi bi-scissors me-2" style="color:var(--gold)"></i>Prospect <span>Barber</span>
+      </a>
+      <div class="d-flex gap-2">
+        <a href="https://wa.me/5567999998888" target="_blank" rel="noopener"
+           class="btn-lp-wa py-2 px-3" style="font-size:.82rem">
+          <i class="bi bi-whatsapp"></i>
+          <span class="d-none d-sm-inline">Falar no WhatsApp</span>
+        </a>
+        <a href="{{ url_for('appointments.book') }}"
+           class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-calendar-plus me-1"></i>Agendar
+        </a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Hero ────────────────────────────────────────────────── -->
+<section class="lp-hero">
+  <div class="container">
+    <div class="lp-hero-eyebrow">
+      <i class="bi bi-scissors"></i> Sistema de Gestão para Barbearias
+    </div>
+    <h1>
+      Pare de perder clientes<br>
+      <em>no caos do WhatsApp</em>
+    </h1>
+    <p class="lp-hero-sub">
+      Agendamento online 24h, controle de assinaturas, gestão de barbeiros e relatórios —
+      tudo em um painel pensado para barbearias que querem crescer.
+    </p>
+    <div class="lp-cta-wrap">
+      <a href="https://wa.me/5567999998888" target="_blank" rel="noopener" class="btn-lp-wa">
+        <i class="bi bi-whatsapp fs-5"></i> Falar no WhatsApp
+      </a>
+      <a href="https://theprospect.com.br/agendar?servico=Prospect%20Barber"
+         target="_blank" rel="noopener" class="btn-lp-demo">
+        <i class="bi bi-calendar-check fs-5"></i> Solicitar demonstração
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── O Problema ──────────────────────────────────────────── -->
+<section class="lp-section">
+  <div class="container">
+    <div class="text-center mb-4">
+      <h2 class="lp-section-title">Você se identifica com isso?</h2>
+    </div>
+    <div class="lp-problem-card">
+      <p>
+        <strong>A agenda da sua barbearia vive no WhatsApp</strong> — e você passa mais tempo respondendo mensagens do que atendendo clientes.
+        Cancelamentos de última hora viram buracos no dia sem aviso. Clientes ligam perguntando horário quando você já está com a tesoura na mão.
+      </p>
+      <p>
+        <strong>No final do mês você não sabe exatamente quanto entrou</strong>, qual serviço deu mais lucro, nem qual barbeiro está performando melhor.
+        O controle de assinaturas é numa planilha, os créditos no papel, e a fila de remarcar no áudio de voz.
+      </p>
+      <p>
+        <strong>Prospect Barber resolve tudo isso</strong> em um sistema acessado do celular — pelo dono, pelo barbeiro e pelo cliente.
+        Sem mensalidade astronômica, sem servidor complicado, sem treinamento de semanas.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── Funcionalidades ──────────────────────────────────────── -->
+<section class="lp-section lp-section-alt">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="lp-section-title">O que o sistema faz por você</h2>
+      <p class="lp-section-sub">Cada funcionalidade foi construída a partir de dores reais de barbearias.</p>
+    </div>
+    <div class="row g-3">
+
+      <div class="col-sm-6 col-lg-4">
+        <div class="lp-feature-card">
+          <div class="lp-feature-icon"><i class="bi bi-calendar-check"></i></div>
+          <div class="lp-feature-title">Agendamento online 24h</div>
+          <p class="lp-feature-desc">Cliente agenda no link da barbearia sem precisar ligar, mandar mensagem ou esperar resposta. Disponível a qualquer hora.</p>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-lg-4">
+        <div class="lp-feature-card">
+          <div class="lp-feature-icon"><i class="bi bi-shield-check"></i></div>
+          <div class="lp-feature-title">Motor de disponibilidade</div>
+          <p class="lp-feature-desc">Zero dupla-reserva. O sistema respeita horário de trabalho, almoço e exceções de agenda de cada barbeiro automaticamente.</p>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-lg-4">
+        <div class="lp-feature-card">
+          <div class="lp-feature-icon"><i class="bi bi-award"></i></div>
+          <div class="lp-feature-title">Clube de Assinatura</div>
+          <p class="lp-feature-desc">Controle de créditos por serviço e kits combinados. O cliente vê os créditos disponíveis direto no portal — sem você precisar conferir.</p>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-lg-4">
+        <div class="lp-feature-card">
+          <div class="lp-feature-icon"><i class="bi bi-person-vcard"></i></div>
+          <div class="lp-feature-title">Portal do cliente por CPF</div>
+          <p class="lp-feature-desc">O cliente confirma, cancela e remarca o próprio horário pelo CPF, sem login e sem te incomodar — direto do celular.</p>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-lg-4">
+        <div class="lp-feature-card">
+          <div class="lp-feature-icon"><i class="bi bi-people"></i></div>
+          <div class="lp-feature-title">Gestão de barbeiros</div>
+          <p class="lp-feature-desc">Horários individuais, foto de perfil, WhatsApp direto e agenda própria para cada profissional da equipe.</p>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-lg-4">
+        <div class="lp-feature-card">
+          <div class="lp-feature-icon"><i class="bi bi-graph-up-arrow"></i></div>
+          <div class="lp-feature-title">Relatórios e exportação</div>
+          <p class="lp-feature-desc">Faturamento, ranking de serviços e barbeiros mais rentáveis. Exportação Excel e PDF para fechar o mês sem enrolação.</p>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-lg-4">
+        <div class="lp-feature-card">
+          <div class="lp-feature-icon"><i class="bi bi-trophy"></i></div>
+          <div class="lp-feature-title">Sorteios para clientes</div>
+          <p class="lp-feature-desc">Engaje e fidelize sua clientela com sorteios gerenciados pelo próprio sistema — simples de criar e transparentes para todos.</p>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-lg-4">
+        <div class="lp-feature-card">
+          <div class="lp-feature-icon"><i class="bi bi-phone"></i></div>
+          <div class="lp-feature-title">100% responsivo</div>
+          <p class="lp-feature-desc">O painel funciona no celular do dono, do barbeiro e do cliente. Não precisa de app instalado — é tudo pelo navegador.</p>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-lg-4">
+        <div class="lp-feature-card">
+          <div class="lp-feature-icon"><i class="bi bi-lock"></i></div>
+          <div class="lp-feature-title">Controle de acesso</div>
+          <p class="lp-feature-desc">Papéis distintos para admin e barbeiro. Cada usuário vê e faz somente o que precisa — sem acidente acidental no sistema.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ── Como Funciona ────────────────────────────────────────── -->
+<section class="lp-section">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-lg-7">
+        <div class="text-center mb-4">
+          <h2 class="lp-section-title">Como funciona na prática</h2>
+          <p class="lp-section-sub">Quatro passos do agendamento ao atendimento, sem você precisar fazer nada.</p>
+        </div>
+
+        <div class="lp-step">
+          <div class="lp-step-num">1</div>
+          <div>
+            <div class="lp-step-title">Cliente acessa e agenda sozinho</div>
+            <p class="lp-step-desc">Você compartilha o link da barbearia. O cliente escolhe serviço, barbeiro, data e horário — sem precisar ligar ou mandar mensagem.</p>
+          </div>
+        </div>
+
+        <div class="lp-step">
+          <div class="lp-step-num">2</div>
+          <div>
+            <div class="lp-step-title">Sistema bloqueia conflitos automaticamente</div>
+            <p class="lp-step-desc">Só aparecem os horários realmente disponíveis. Almoço, folgas e exceções são respeitados — dupla-reserva zero.</p>
+          </div>
+        </div>
+
+        <div class="lp-step">
+          <div class="lp-step-num">3</div>
+          <div>
+            <div class="lp-step-title">Barbeiro e dono acompanham pelo painel</div>
+            <p class="lp-step-desc">A agenda do dia aparece em tempo real. O dono vê o movimento de todos os barbeiros; cada barbeiro vê a própria agenda.</p>
+          </div>
+        </div>
+
+        <div class="lp-step">
+          <div class="lp-step-num">4</div>
+          <div>
+            <div class="lp-step-title">Cliente confirma, cancela ou remarca pelo CPF</div>
+            <p class="lp-step-desc">Direto no portal, sem login e sem ligar para você. O sistema atualiza a agenda instantaneamente — horário liberado vira disponível para outro.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA Final ────────────────────────────────────────────── -->
+<section class="lp-cta-section">
+  <div class="container">
+    <h2>Pronto para organizar sua barbearia?</h2>
+    <p>Fale com a Prospect+ e veja o sistema rodando com os dados da sua barbearia.</p>
+    <div class="lp-cta-wrap">
+      <a href="https://wa.me/5567999998888" target="_blank" rel="noopener" class="btn-lp-wa-inv">
+        <i class="bi bi-whatsapp fs-5"></i> Falar no WhatsApp
+      </a>
+      <a href="https://theprospect.com.br/agendar?servico=Prospect%20Barber"
+         target="_blank" rel="noopener" class="btn-lp-demo-inv">
+        <i class="bi bi-calendar-check fs-5"></i> Solicitar demonstração
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── Footer ───────────────────────────────────────────────── -->
+<footer class="lp-footer">
+  <div class="container">
+    <i class="bi bi-scissors me-1" style="color:var(--gold)"></i>
+    © {{ now.year if now is defined else 2026 }} Prospect Barber · Desenvolvido por
+    <a href="https://theprospect.com.br" target="_blank" rel="noopener">Prospect+</a>
+    · <a href="{{ url_for('appointments.book') }}">Agendar horário</a>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -62,6 +62,7 @@ def _register_blueprints(app: Flask) -> None:
     from app.reports.routes import reports_bp
     from app.client.routes import client_bp
     from app.subscriptions.routes import subscriptions_bp
+    from app.pages.routes import pages_bp
 
     app.register_blueprint(auth_bp,           url_prefix="/auth")
     app.register_blueprint(dashboard_bp,      url_prefix="/")
@@ -73,6 +74,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(reports_bp,        url_prefix="/reports")
     app.register_blueprint(client_bp,         url_prefix="/client")
     app.register_blueprint(subscriptions_bp,  url_prefix="/subscriptions")
+    app.register_blueprint(pages_bp,          url_prefix="/")
 
 
 def _configure_login_manager() -> None:
