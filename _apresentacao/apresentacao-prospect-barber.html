@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prospect Barber — Sistema de Gestão para Barbearias</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Reset ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+
+    /* ── Paleta ─────────────────────────────────────────────────── */
+    :root {
+      --accent:        #4A6B85;
+      --accent-light:  #6088A8;
+      --accent-soft:   rgba(74, 107, 133, 0.09);
+      --accent-border: rgba(74, 107, 133, 0.22);
+      --sage:          #7D9486;
+      --sage-soft:     rgba(125, 148, 134, 0.12);
+      --sage-border:   rgba(125, 148, 134, 0.28);
+      --bg:            #E9EAEC;
+      --bg-card:       #FFFFFF;
+      --bg-raised:     #F3F4F6;
+      --text:          #1E2A35;
+      --text-sec:      #3D4F60;
+      --text-muted:    #637080;
+      --text-dim:      #9BAAB8;
+      --border:        #D8DCE4;
+      --border-med:    #B8C0CC;
+    }
+
+    /* ── Base ───────────────────────────────────────────────────── */
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Lora', Georgia, serif;
+      font-size: 1rem;
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────── */
+    .container {
+      width: 100%;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* ── Tipografia ──────────────────────────────────────────────── */
+    h1, h2, h3, h4 {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--text);
+    }
+    h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); }
+    h2 { font-size: clamp(1.3rem, 3vw, 1.75rem); margin-bottom: 6px; }
+    h3 { font-size: 1.05rem; font-weight: 700; }
+    p  { color: var(--text-sec); }
+
+    /* ── Header ──────────────────────────────────────────────────── */
+    .site-header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      padding: 36px 0 32px;
+      text-align: center;
+    }
+    .header-eyebrow {
+      display: inline-block;
+      font-family: 'Playfair Display', serif;
+      font-size: .75rem; font-weight: 600;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 14px;
+    }
+    .header-sub {
+      font-size: 1.02rem;
+      color: var(--text-muted);
+      max-width: 560px;
+      margin: 12px auto 0;
+      font-style: italic;
+    }
+    .scissors-icon {
+      display: inline-block;
+      width: 42px; height: 42px; border-radius: 10px;
+      background: var(--accent-soft); border: 1px solid var(--accent-border);
+      color: var(--accent);
+      text-align: center; line-height: 42px;
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+    }
+    /* SVG scissors inline */
+    .icon-scissors { width: 20px; height: 20px; vertical-align: middle; }
+
+    /* ── Sections ────────────────────────────────────────────────── */
+    section { padding: 52px 0; }
+    section + section { border-top: 1px solid var(--border); }
+    .section-label {
+      font-family: 'Playfair Display', serif;
+      font-size: .68rem; font-weight: 700;
+      letter-spacing: .14em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 8px;
+    }
+
+    /* ── Visão geral ─────────────────────────────────────────────── */
+    .overview-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: 10px;
+      padding: 28px 32px;
+      margin-top: 24px;
+    }
+    .overview-card p { font-size: 1.02rem; line-height: 1.75; }
+    .overview-card p + p { margin-top: 14px; }
+
+    /* ── Grid de módulos ─────────────────────────────────────────── */
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 28px;
+    }
+    .module-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px 20px;
+      transition: border-color .15s;
+    }
+    .module-card:hover { border-color: var(--accent-border); }
+    .module-header {
+      display: flex; align-items: flex-start; gap: 12px;
+      margin-bottom: 10px;
+    }
+    .module-icon {
+      width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
+      background: var(--accent-soft); border: 1px solid var(--accent-border);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .module-icon svg { width: 17px; height: 17px; stroke: var(--accent); fill: none;
+      stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .module-icon.sage-icon {
+      background: var(--sage-soft); border-color: var(--sage-border);
+    }
+    .module-icon.sage-icon svg { stroke: var(--sage); }
+    .module-title {
+      font-family: 'Playfair Display', serif;
+      font-size: .97rem; font-weight: 700;
+      color: var(--text); margin-bottom: 2px;
+    }
+    .module-tag {
+      font-size: .63rem; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--accent);
+    }
+    .module-desc {
+      font-size: .875rem; line-height: 1.6; color: var(--text-muted);
+    }
+    .module-features {
+      list-style: none; margin-top: 10px; display: flex; flex-direction: column; gap: 5px;
+    }
+    .module-features li {
+      font-size: .82rem; color: var(--text-sec);
+      display: flex; align-items: baseline; gap: 7px;
+    }
+    .module-features li::before {
+      content: ''; display: inline-block;
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--sage); flex-shrink: 0; margin-top: 2px;
+    }
+
+    /* ── Stack tecnológica ───────────────────────────────────────── */
+    .stack-section { background: var(--bg-card); }
+    .stack-groups {
+      display: flex; flex-wrap: wrap; gap: 24px; margin-top: 24px;
+    }
+    .stack-group { flex: 1; min-width: 200px; }
+    .stack-group-label {
+      font-size: .68rem; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+    .stack-tags { display: flex; flex-wrap: wrap; gap: 7px; }
+    .stack-tag {
+      background: var(--bg-raised);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 11px;
+      font-size: .78rem; font-weight: 600;
+      color: var(--text-sec);
+      font-family: 'Lora', serif;
+    }
+    .stack-tag.primary {
+      background: var(--accent-soft); border-color: var(--accent-border);
+      color: var(--accent);
+    }
+
+    /* ── Rodapé ─────────────────────────────────────────────────── */
+    .site-footer {
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      padding: 22px 0;
+      text-align: center;
+      font-size: .8rem;
+      color: var(--text-muted);
+    }
+    .footer-brand {
+      font-family: 'Playfair Display', serif;
+      font-size: .88rem; font-weight: 700;
+      color: var(--text);
+    }
+
+    /* ── Divider ─────────────────────────────────────────────────── */
+    .divider {
+      border: none; border-top: 1px solid var(--border); margin: 0;
+    }
+
+    /* ── Responsive ──────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      section { padding: 36px 0; }
+      .overview-card { padding: 20px 18px; }
+      .modules-grid { grid-template-columns: 1fr; }
+      .stack-groups { flex-direction: column; gap: 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- HEADER                                                  -->
+<!-- ══════════════════════════════════════════════════════ -->
+<header class="site-header">
+  <div class="container">
+    <div class="scissors-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round" class="icon-scissors">
+        <circle cx="6" cy="6" r="3"/>
+        <circle cx="6" cy="18" r="3"/>
+        <line x1="20" y1="4" x2="8.12" y2="15.88"/>
+        <line x1="14.47" y1="14.48" x2="20" y2="20"/>
+        <line x1="8.12" y1="8.12" x2="12" y2="12"/>
+      </svg>
+    </div>
+    <div class="header-eyebrow">Prospect+ · Produto</div>
+    <h1>Prospect Barber</h1>
+    <p class="header-sub">
+      Sistema de gestão desenvolvido pela Prospect+ para barbearias e estúdios de beleza
+    </p>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- VISÃO GERAL                                             -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">Visão geral</div>
+    <h2>O que é o sistema</h2>
+    <div class="overview-card">
+      <p>
+        O Prospect Barber é uma aplicação web desenvolvida pela Prospect+ para centralizar a operação
+        de barbearias: agendamento online de clientes, gestão de barbeiros e serviços, controle de
+        assinaturas com créditos por serviço, e acompanhamento financeiro via relatórios exportáveis.
+      </p>
+      <p>
+        O sistema é acessado integralmente pelo navegador — sem instalação de aplicativo — e oferece
+        interfaces distintas para o administrador, os barbeiros da equipe e os próprios clientes.
+        A base de dados é SQLite no ambiente de desenvolvimento, com suporte a PostgreSQL para produção,
+        e o servidor de aplicação é o Gunicorn com configuração de deploy incluída.
+      </p>
+      <p>
+        A arquitetura segue o padrão de <em>blueprints</em> do Flask, com módulos independentes para
+        cada domínio (agendamentos, clientes, barbeiros, serviços, assinaturas, sorteios, relatórios e
+        portal do cliente), compartilhando extensões comuns (SQLAlchemy, Flask-Login, Flask-WTF/CSRF).
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- FUNCIONALIDADES                                         -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section>
+  <div class="container">
+    <div class="section-label">Módulos</div>
+    <h2>Funcionalidades por módulo</h2>
+
+    <div class="modules-grid">
+
+      <!-- Agendamentos -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <div>
+            <div class="module-title">Agendamentos</div>
+            <div class="module-tag">Motor de disponibilidade</div>
+          </div>
+        </div>
+        <p class="module-desc">
+          Fluxo guiado de agendamento online, acessível sem login pelo cliente. O motor de
+          disponibilidade gera slots horários de 60 em 60 minutos e valida colisões considerando
+          a duração real de cada serviço ou kit.
+        </p>
+        <ul class="module-features">
+          <li>Bloqueio automático de horários ocupados (status: pendente, confirmado, concluído)</li>
+          <li>Suporte a kits de serviço com duração agregada</li>
+          <li>Respeita horário de trabalho e intervalo de almoço por barbeiro</li>
+          <li>Exceções de agenda: folga ou horário especial por data</li>
+          <li>Rejeição de horários no passado (comparação com fuso horário configurável)</li>
+          <li>Ciclo de status: Pendente → Confirmado → Concluído / Cancelado / Não compareceu</li>
+        </ul>
+      </div>
+
+      <!-- Portal do Cliente -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon sage-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <div>
+            <div class="module-title">Portal do Cliente</div>
+            <div class="module-tag">Autoatendimento por CPF</div>
+          </div>
+        </div>
+        <p class="module-desc">
+          Interface pública em que o cliente consulta, confirma, cancela e remarca seus
+          agendamentos informando apenas o CPF — sem criar conta ou fazer login.
+        </p>
+        <ul class="module-features">
+          <li>Validação do CPF com verificação dos dois dígitos verificadores</li>
+          <li>Listagem de agendamentos futuros (primeiro) e histórico</li>
+          <li>Badge "Aguardando confirmação" com animação de pulso para pendentes</li>
+          <li>Ações disponíveis por status: confirmar, remarcar, cancelar</li>
+          <li>Exibição de créditos de assinatura disponíveis por serviço</li>
+          <li>Rate limiting por IP para proteger o endpoint de busca</li>
+        </ul>
+      </div>
+
+      <!-- Clientes -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <div>
+            <div class="module-title">Clientes</div>
+            <div class="module-tag">Cadastro e histórico</div>
+          </div>
+        </div>
+        <p class="module-desc">
+          Cadastro de clientes com validação de CPF único e histórico completo de visitas.
+          Registro automático na criação do primeiro agendamento.
+        </p>
+        <ul class="module-features">
+          <li>Identificação por CPF com formatação e unicidade garantida</li>
+          <li>Histórico paginado de agendamentos por cliente</li>
+          <li>Detalhamento de assinaturas ativas e créditos usados</li>
+        </ul>
+      </div>
+
+      <!-- Barbeiros -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24">
+              <circle cx="6" cy="6" r="3"/>
+              <circle cx="6" cy="18" r="3"/>
+              <line x1="20" y1="4" x2="8.12" y2="15.88"/>
+              <line x1="14.47" y1="14.48" x2="20" y2="20"/>
+              <line x1="8.12" y1="8.12" x2="12" y2="12"/>
+            </svg>
+          </div>
+          <div>
+            <div class="module-title">Barbeiros</div>
+            <div class="module-tag">Perfis e agenda individual</div>
+          </div>
+        </div>
+        <p class="module-desc">
+          Perfil completo para cada profissional da equipe, com configuração independente de
+          disponibilidade e acesso restrito ao próprio painel.
+        </p>
+        <ul class="module-features">
+          <li>Foto de perfil com upload validado por conteúdo via Pillow</li>
+          <li>Horário de trabalho e intervalo de almoço configuráveis individualmente</li>
+          <li>Exceções de agenda por data: folga completa ou horário especial</li>
+          <li>Link de WhatsApp computado automaticamente a partir do telefone</li>
+          <li>Estatísticas: total, concluídos e atendimentos do dia/mês</li>
+          <li>Avatar com iniciais como fallback quando não há foto</li>
+        </ul>
+      </div>
+
+      <!-- Serviços e Kits -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon sage-icon">
+            <svg viewBox="0 0 24 24">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </div>
+          <div>
+            <div class="module-title">Serviços e Kits</div>
+            <div class="module-tag">Catálogo de atendimentos</div>
+          </div>
+        </div>
+        <p class="module-desc">
+          Catálogo de serviços individuais (nome, duração, preço, descrição) e kits compostos
+          por múltiplos serviços, com duração e preço totais calculados automaticamente.
+        </p>
+        <ul class="module-features">
+          <li>Serviços com duração em minutos e exibição formatada</li>
+          <li>Kits com N serviços: duração e preço são a soma dos itens</li>
+          <li>Motor de disponibilidade respeita a duração real do kit na detecção de colisão</li>
+        </ul>
+      </div>
+
+      <!-- Clube de Assinatura -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="8" r="6"/>
+              <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
+            </svg>
+          </div>
+          <div>
+            <div class="module-title">Clube de Assinatura</div>
+            <div class="module-tag">Créditos por serviço</div>
+          </div>
+        </div>
+        <p class="module-desc">
+          Planos de assinatura com créditos associados a serviços específicos, validade
+          configurável e rastreamento de uso por agendamento.
+        </p>
+        <ul class="module-features">
+          <li>Planos com N créditos por serviço (ex.: 4 cortes/mês)</li>
+          <li>Saldo de créditos acompanhado em tempo real pelo cliente no portal</li>
+          <li>Status automático: ativa, vencida, vencida com créditos, cancelada</li>
+          <li>Alerta de vencimento próximo (≤ 3 dias restantes)</li>
+          <li>Histórico de uso: qual crédito foi consumido em qual agendamento</li>
+          <li>Suporte a renovação com registro de data de renovação</li>
+        </ul>
+      </div>
+
+      <!-- Sorteios -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon sage-icon">
+            <svg viewBox="0 0 24 24">
+              <polyline points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </div>
+          <div>
+            <div class="module-title">Sorteios</div>
+            <div class="module-tag">Engajamento de clientes</div>
+          </div>
+        </div>
+        <p class="module-desc">
+          Módulo para criação e execução de sorteios entre clientes elegíveis dentro de um
+          período definido. Resultado registrado com snapshot imutável dos ganhadores.
+        </p>
+        <ul class="module-features">
+          <li>Período de elegibilidade configurável (data início e fim)</li>
+          <li>Número de ganhadores definido pelo administrador</li>
+          <li>Snapshot do nome e telefone do cliente no momento do sorteio</li>
+          <li>Status: Pendente / Sorteado — sorteio executado uma única vez</li>
+          <li>Exibição dos ganhadores com medalhas de posição (1º, 2º, 3º lugar)</li>
+        </ul>
+      </div>
+
+      <!-- Relatórios -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon">
+            <svg viewBox="0 0 24 24">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+          </div>
+          <div>
+            <div class="module-title">Relatórios</div>
+            <div class="module-tag">Excel e PDF</div>
+          </div>
+        </div>
+        <p class="module-desc">
+          Quatro relatórios gerenciais com filtros de período, exportáveis em Excel (.xlsx)
+          e PDF. Geração no servidor via pandas, openpyxl e ReportLab.
+        </p>
+        <ul class="module-features">
+          <li><strong>Agendamentos</strong> — lista detalhada por período e status</li>
+          <li><strong>Faturamento</strong> — receita por período, com totais</li>
+          <li><strong>Serviços</strong> — ranking de serviços mais agendados e rentáveis</li>
+          <li><strong>Barbeiros</strong> — desempenho individual e comparativo</li>
+          <li>Acesso restrito ao perfil administrador</li>
+        </ul>
+      </div>
+
+      <!-- Segurança e Infraestrutura -->
+      <div class="module-card">
+        <div class="module-header">
+          <div class="module-icon sage-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <div>
+            <div class="module-title">Segurança</div>
+            <div class="module-tag">Auth · CSRF · Headers</div>
+          </div>
+        </div>
+        <p class="module-desc">
+          Autenticação baseada em papéis com proteções ativas contra os vetores mais
+          comuns de ataque em aplicações web.
+        </p>
+        <ul class="module-features">
+          <li>Papéis distintos: <em>admin</em> (gestão completa) e <em>barbeiro</em> (painel restrito)</li>
+          <li>Proteção contra brute-force: bloqueio automático após N tentativas inválidas</li>
+          <li>CSRF em todos os formulários e endpoints de mutação (Flask-WTF)</li>
+          <li>Validação de uploads por conteúdo via Pillow (não só por extensão)</li>
+          <li>Headers de segurança: <code>X-Content-Type-Options</code>, <code>X-Frame-Options</code>, <code>HSTS</code></li>
+          <li>Proteção contra open redirect no fluxo de login</li>
+          <li>Rate limiting no endpoint público de consulta por CPF</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- STACK TECNOLÓGICA                                       -->
+<!-- ══════════════════════════════════════════════════════ -->
+<section class="stack-section">
+  <div class="container">
+    <div class="section-label">Tecnologias</div>
+    <h2>Stack utilizada</h2>
+
+    <div class="stack-groups">
+
+      <div class="stack-group">
+        <div class="stack-group-label">Framework</div>
+        <div class="stack-tags">
+          <span class="stack-tag primary">Flask 3.1</span>
+          <span class="stack-tag primary">Flask-SQLAlchemy 3.1</span>
+          <span class="stack-tag primary">Flask-Login 0.6</span>
+          <span class="stack-tag primary">Flask-WTF 1.2</span>
+          <span class="stack-tag">WTForms 3.2</span>
+          <span class="stack-tag">Werkzeug 3.1</span>
+        </div>
+      </div>
+
+      <div class="stack-group">
+        <div class="stack-group-label">Banco de dados</div>
+        <div class="stack-tags">
+          <span class="stack-tag primary">SQLAlchemy 2.0</span>
+          <span class="stack-tag">SQLite (dev)</span>
+          <span class="stack-tag">PostgreSQL (prod)</span>
+        </div>
+      </div>
+
+      <div class="stack-group">
+        <div class="stack-group-label">Relatórios</div>
+        <div class="stack-tags">
+          <span class="stack-tag">pandas 2.2</span>
+          <span class="stack-tag">openpyxl 3.1</span>
+          <span class="stack-tag">ReportLab 4.2</span>
+        </div>
+      </div>
+
+      <div class="stack-group">
+        <div class="stack-group-label">Infraestrutura</div>
+        <div class="stack-tags">
+          <span class="stack-tag primary">Gunicorn 22</span>
+          <span class="stack-tag">python-dotenv</span>
+          <span class="stack-tag">Pillow 11</span>
+        </div>
+      </div>
+
+      <div class="stack-group">
+        <div class="stack-group-label">Frontend</div>
+        <div class="stack-tags">
+          <span class="stack-tag">Bootstrap 5.3</span>
+          <span class="stack-tag">Bootstrap Icons 1.11</span>
+          <span class="stack-tag">Playfair Display</span>
+          <span class="stack-tag">Lora</span>
+          <span class="stack-tag">JavaScript vanilla</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<!-- RODAPÉ                                                  -->
+<!-- ══════════════════════════════════════════════════════ -->
+<footer class="site-footer">
+  <div class="container">
+    <p>
+      <span class="footer-brand">Prospect Barber</span>
+      &ensp;·&ensp;
+      Desenvolvido por <strong>Prospect+</strong>
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
