@@ -60,4 +60,4 @@ class ServiceKitItem(db.Model):
     order = db.Column(db.Integer, nullable=False, default=1)
 
     kit = db.relationship("ServiceKit", back_populates="items")
-    service = db.relationship("Service", foreign_keys=[service_id])
+    service = db.relationship("Servico", foreign_keys=[service_id])

@@ -1,7 +1,7 @@
 import os
 import logging
 from logging.handlers import RotatingFileHandler
-from flask import Flask, render_template, redirect, url_for, flash
+from flask import Flask, render_template, redirect, url_for, flash, session, g
 from flask_login import current_user, logout_user
 from app.config import config
 from app.extensions import db, login_manager, csrf, migrate
@@ -60,11 +60,13 @@ def _register_blueprints(app: Flask) -> None:
     from app.customers.routes import customers_bp
     from app.services.routes import services_bp
     from app.appointments.routes import appointments_bp
+    from app.booking.routes import booking_bp
     from app.raffle.routes import raffle_bp
     from app.reports.routes import reports_bp
     from app.client.routes import client_bp
     from app.subscriptions.routes import subscriptions_bp
     from app.pages.routes import pages_bp
+    from app.superadmin.routes import superadmin_bp
 
     app.register_blueprint(auth_bp,           url_prefix="/auth")
     app.register_blueprint(dashboard_bp,      url_prefix="/")
@@ -72,29 +74,55 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(customers_bp,      url_prefix="/customers")
     app.register_blueprint(services_bp,       url_prefix="/services")
     app.register_blueprint(appointments_bp,   url_prefix="/appointments")
+    app.register_blueprint(booking_bp,        url_prefix="/agendar")
     app.register_blueprint(raffle_bp,         url_prefix="/raffle")
     app.register_blueprint(reports_bp,        url_prefix="/reports")
-    app.register_blueprint(client_bp,         url_prefix="/client")
+    app.register_blueprint(client_bp,         url_prefix="/p")
     app.register_blueprint(subscriptions_bp,  url_prefix="/subscriptions")
     app.register_blueprint(pages_bp,          url_prefix="/")
+    app.register_blueprint(superadmin_bp,     url_prefix="/superadmin")
 
 
 def _configure_login_manager() -> None:
-    from app.models.user import User
+    from app.models.usuario import Usuario
 
     @login_manager.user_loader
     def load_user(user_id: str):
-        return db.session.get(User, int(user_id))
+        # session-level get() ignora o filtro de tenant de propósito: em login
+        # ainda não há g.empresa_id — ele é justamente derivado do usuário aqui.
+        return db.session.get(Usuario, int(user_id))
 
 
 def _register_middleware(app: Flask) -> None:
 
     @app.before_request
     def enforce_active_session():
-        if current_user.is_authenticated and not current_user.is_active:
+        if current_user.is_authenticated and not current_user.ativo:
             logout_user()
             flash("Sua conta foi desativada. Contate o administrador.", "danger")
             return redirect(url_for("auth.login"))
+
+    @app.before_request
+    def load_tenant_context():
+        """Popula g.empresa_id/g.unidade_id a partir da sessão autenticada.
+
+        Rotas públicas que resolvem empresa/unidade por slug (agenda pública,
+        portal do cliente) sobrescrevem g.empresa_id/g.unidade_id explicitamente
+        depois de validar o slug — ver app/booking/routes.py e app/client/routes.py.
+        """
+        g.empresa_id = None
+        g.unidade_id = None
+        if not current_user.is_authenticated:
+            return
+
+        g.empresa_id = current_user.empresa_id
+
+        from app.utils.tenant_context import usuario_pode_acessar_unidade
+        unidade_ativa_id = session.get("unidade_ativa_id")
+        if unidade_ativa_id and usuario_pode_acessar_unidade(current_user, unidade_ativa_id):
+            g.unidade_id = unidade_ativa_id
+        else:
+            session.pop("unidade_ativa_id", None)
 
 
 def _register_security_headers(app: Flask) -> None:
@@ -193,7 +221,8 @@ def _ensure_schema(app: Flask) -> None:
 
 def _register_shell_context(app: Flask) -> None:
     from app.models import (
-        User, Barber, Customer, Service, Appointment, Raffle,
+        Empresa, Unidade, Usuario, UsuarioUnidade, AuditLog,
+        Profissional, Cliente, Servico, Agendamento, Raffle,
         ServiceKit, ServiceKitItem,
         SubscriptionPlan, SubscriptionPlanCredit,
         CustomerSubscription, SubscriptionCreditBalance, SubscriptionCreditUsage,
@@ -204,11 +233,15 @@ def _register_shell_context(app: Flask) -> None:
     def make_shell_context():
         return {
             "db": db,
-            "User": User,
-            "Barber": Barber,
-            "Customer": Customer,
-            "Service": Service,
-            "Appointment": Appointment,
+            "Empresa": Empresa,
+            "Unidade": Unidade,
+            "Usuario": Usuario,
+            "UsuarioUnidade": UsuarioUnidade,
+            "AuditLog": AuditLog,
+            "Profissional": Profissional,
+            "Cliente": Cliente,
+            "Servico": Servico,
+            "Agendamento": Agendamento,
             "Raffle": Raffle,
             "ServiceKit": ServiceKit,
             "ServiceKitItem": ServiceKitItem,

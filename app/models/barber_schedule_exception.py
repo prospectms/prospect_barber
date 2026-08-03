@@ -1,8 +1,10 @@
 from datetime import datetime
 from app.extensions import db
+from app.models.tenant import TenantMixin, UnidadeMixin
 
 
-class BarberScheduleException(db.Model):
+class BarberScheduleException(TenantMixin, UnidadeMixin, db.Model):
+    """Mantém o nome (pedido explícito da Fase 1-A), ganha escopo de empresa/unidade."""
     __tablename__ = "barber_schedule_exception"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -14,7 +16,7 @@ class BarberScheduleException(db.Model):
     reason = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    barber = db.relationship("Barber", back_populates="schedule_exceptions")
+    barber = db.relationship("Profissional", back_populates="schedule_exceptions")
 
     __table_args__ = (
         db.UniqueConstraint("barber_id", "date", name="uq_barber_exception_date"),

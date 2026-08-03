@@ -15,7 +15,7 @@ class CustomerSubscription(db.Model):
     renewed_at = db.Column(db.DateTime, nullable=True)
 
     plan = db.relationship("SubscriptionPlan", back_populates="subscriptions")
-    customer = db.relationship("Customer", back_populates="subscriptions")
+    customer = db.relationship("Cliente", back_populates="subscriptions")
     credit_balances = db.relationship(
         "SubscriptionCreditBalance",
         back_populates="subscription",
@@ -101,7 +101,7 @@ class SubscriptionCreditBalance(db.Model):
     used_credits = db.Column(db.Integer, nullable=False, default=0)
 
     subscription = db.relationship("CustomerSubscription", back_populates="credit_balances")
-    service = db.relationship("Service", foreign_keys=[service_id])
+    service = db.relationship("Servico", foreign_keys=[service_id])
 
     @property
     def remaining_credits(self) -> int:
@@ -123,5 +123,5 @@ class SubscriptionCreditUsage(db.Model):
     notes = db.Column(db.String(255), nullable=True)
 
     subscription = db.relationship("CustomerSubscription", back_populates="credit_usages")
-    service = db.relationship("Service", foreign_keys=[service_id])
-    appointment = db.relationship("Appointment", foreign_keys=[appointment_id])
+    service = db.relationship("Servico", foreign_keys=[service_id])
+    appointment = db.relationship("Agendamento", foreign_keys=[appointment_id])

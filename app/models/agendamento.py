@@ -1,5 +1,7 @@
-from app.extensions import db
 from datetime import datetime, timezone
+
+from app.extensions import db
+from app.models.tenant import TenantMixin, UnidadeMixin
 
 APPOINTMENT_STATUSES = {
     "pending": "Pendente",
@@ -18,7 +20,10 @@ STATUS_COLORS = {
 }
 
 
-class Appointment(db.Model):
+class Agendamento(TenantMixin, UnidadeMixin, db.Model):
+    """Antigo `Appointment`. Tabela mantida como `appointments` (ver nota em
+    usuario.py). `kit_id` continua apontando para `service_kit` — model
+    satélite, fora do escopo de multi-tenant desta fase (Fase 1-B)."""
     __tablename__ = "appointments"
     __table_args__ = (
         db.Index("ix_appt_barber_date", "barber_id", "scheduled_date"),
@@ -76,4 +81,4 @@ class Appointment(db.Model):
         return t.strftime("%H:%M") if t else ""
 
     def __repr__(self) -> str:
-        return f"<Appointment #{self.id} [{self.status}]>"
+        return f"<Agendamento #{self.id} [{self.status}]>"

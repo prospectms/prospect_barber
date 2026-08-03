@@ -74,7 +74,7 @@ class RaffleWinner(db.Model):
 
     drawn_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
-    customer = db.relationship("Customer", foreign_keys=[customer_id], back_populates="raffle_winners")
+    customer = db.relationship("Cliente", foreign_keys=[customer_id], back_populates="raffle_winners")
 
     # ── Helpers ──────────────────────────────────────────────────────────
 

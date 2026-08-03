@@ -44,4 +44,4 @@ class SubscriptionPlanCredit(db.Model):
     quantity = db.Column(db.Integer, nullable=False, default=1)
 
     plan = db.relationship("SubscriptionPlan", back_populates="credits")
-    service = db.relationship("Service", foreign_keys=[service_id])
+    service = db.relationship("Servico", foreign_keys=[service_id])
