@@ -5,12 +5,20 @@ from collections import defaultdict
 from datetime import date, datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from app.extensions import db
-from app.models.customer import Customer
-from app.models.appointment import Appointment, APPOINTMENT_STATUSES
-from app.models.barber import Barber
+from app.models.cliente import Cliente
+from app.models.agendamento import Agendamento, APPOINTMENT_STATUSES
+from app.models.profissional import Profissional
 from app.appointments.availability import get_available_slots, is_slot_available
+from app.utils.tenant_context import resolver_unidade_por_slug
+from app.utils.feature_flags import SATELLITE_FEATURES_ENABLED
 
 client_bp = Blueprint("client", __name__)
+
+# Portal do cliente — /p/<slug-da-unidade>/lookup. Sem login. Toda rota
+# resolve a unidade pelo slug ANTES de qualquer query (popula
+# g.empresa_id/g.unidade_id — ver resolver_unidade_por_slug). Isso faz
+# Cliente.query.filter_by(cpf=...) sair automaticamente escopado por
+# empresa: o mesmo CPF pode existir em empresas diferentes sem colisão.
 
 # ── Rate limiting para lookup de CPF ──────────────────────────────────────────
 _lookup_lock = threading.Lock()
@@ -53,26 +61,32 @@ def _format_cpf(cpf: str) -> str:
     return cpf
 
 
-def _verify_ownership(appt: Appointment, cpf: str) -> bool:
+def _session_keys(slug: str) -> tuple[str, str, str]:
+    """Chaves de sessão amarradas ao slug — um CPF verificado na unidade A
+    não pode ficar "logado" ao navegar para a URL da unidade B."""
+    return f"client_cpf_{slug}", f"client_date_from_{slug}", f"client_date_to_{slug}"
+
+
+def _verify_ownership(appt: Agendamento, cpf: str) -> bool:
     if not cpf or not appt.customer or not appt.customer.cpf:
         return False
     return _format_cpf(cpf) == appt.customer.cpf
 
 
-def _load_appointments(customer: Customer, date_from: str, date_to: str):
+def _load_appointments(customer: Cliente, date_from: str, date_to: str):
     q = customer.appointments
     if date_from:
         try:
-            q = q.filter(Appointment.scheduled_date >= date.fromisoformat(date_from))
+            q = q.filter(Agendamento.scheduled_date >= date.fromisoformat(date_from))
         except ValueError:
             pass
     if date_to:
         try:
-            q = q.filter(Appointment.scheduled_date <= date.fromisoformat(date_to))
+            q = q.filter(Agendamento.scheduled_date <= date.fromisoformat(date_to))
         except ValueError:
             pass
     all_appts = q.order_by(
-        Appointment.scheduled_date.desc(), Appointment.scheduled_time.desc()
+        Agendamento.scheduled_date.desc(), Agendamento.scheduled_time.desc()
     ).all()
     today = date.today()
     future = sorted(
@@ -83,11 +97,14 @@ def _load_appointments(customer: Customer, date_from: str, date_to: str):
     return future + past
 
 
-@client_bp.route("/lookup", methods=["GET", "POST"])
-def lookup():
-    cpf_input = session.get("client_cpf", "")
-    date_from = session.get("client_date_from", "")
-    date_to = session.get("client_date_to", "")
+@client_bp.route("/<slug>/lookup", methods=["GET", "POST"])
+def lookup(slug: str):
+    unidade = resolver_unidade_por_slug(slug)
+    cpf_key, from_key, to_key = _session_keys(slug)
+
+    cpf_input = session.get(cpf_key, "")
+    date_from = session.get(from_key, "")
+    date_to = session.get(to_key, "")
     customer = None
     appointments = []
 
@@ -98,38 +115,40 @@ def lookup():
 
         if _rate_limited(request.remote_addr or ""):
             flash("Muitas tentativas. Aguarde 1 minuto e tente novamente.", "danger")
-            return redirect(url_for("client.lookup"))
+            return redirect(url_for("client.lookup", slug=slug))
 
         clean = _clean_cpf(cpf_input)
         if not cpf_input:
-            session.pop("client_cpf", None)
-            session.pop("client_date_from", None)
-            session.pop("client_date_to", None)
+            session.pop(cpf_key, None)
+            session.pop(from_key, None)
+            session.pop(to_key, None)
         elif len(clean) != 11:
             flash("CPF inválido. Informe os 11 dígitos.", "danger")
-            session.pop("client_cpf", None)
+            session.pop(cpf_key, None)
         else:
             formatted = _format_cpf(cpf_input)
-            found = Customer.query.filter_by(cpf=formatted).first()
+            found = Cliente.query.filter_by(cpf=formatted).first()
             if not found:
                 flash("CPF não encontrado. Verifique o número ou realize um agendamento.", "warning")
-                session.pop("client_cpf", None)
+                session.pop(cpf_key, None)
             else:
-                session["client_cpf"] = formatted
-                session["client_date_from"] = date_from
-                session["client_date_to"] = date_to
-        return redirect(url_for("client.lookup"))
+                session[cpf_key] = formatted
+                session[from_key] = date_from
+                session[to_key] = date_to
+        return redirect(url_for("client.lookup", slug=slug))
 
     subscription = None
     if cpf_input:
-        customer = Customer.query.filter_by(cpf=cpf_input).first()
+        customer = Cliente.query.filter_by(cpf=cpf_input).first()
         if customer:
             appointments = _load_appointments(customer, date_from, date_to)
-            from app.subscriptions.service import get_active_subscription
-            subscription = get_active_subscription(customer.id)
+            if SATELLITE_FEATURES_ENABLED:
+                from app.subscriptions.service import get_active_subscription
+                subscription = get_active_subscription(customer.id)
 
     return render_template(
         "client/lookup.html",
+        unidade=unidade,
         customer=customer,
         appointments=appointments,
         cpf_input=cpf_input,
@@ -141,14 +160,17 @@ def lookup():
     )
 
 
-@client_bp.route("/appointment/<int:appt_id>/confirm", methods=["POST"])
-def confirm_appointment(appt_id: int):
-    appt = Appointment.query.get_or_404(appt_id)
+@client_bp.route("/<slug>/appointment/<int:appt_id>/confirm", methods=["POST"])
+def confirm_appointment(slug: str, appt_id: int):
+    unidade = resolver_unidade_por_slug(slug)
+    # filter_by(unidade_id=...) além do get_or_404 padrão: fecha a chance de
+    # confirmar um appt_id de outra unidade/empresa (ver ponto 3 combinado).
+    appt = Agendamento.query.filter_by(id=appt_id, unidade_id=unidade.id).first_or_404()
     cpf = request.form.get("cpf", "").strip()
 
     if not _verify_ownership(appt, cpf):
         flash("Acesso negado.", "danger")
-        return redirect(url_for("client.lookup"))
+        return redirect(url_for("client.lookup", slug=slug))
 
     if appt.status != "pending":
         flash("Apenas agendamentos pendentes podem ser confirmados.", "warning")
@@ -157,44 +179,50 @@ def confirm_appointment(appt_id: int):
         db.session.commit()
         flash("Agendamento confirmado!", "success")
 
-    return redirect(url_for("client.lookup"))
+    return redirect(url_for("client.lookup", slug=slug))
 
 
-@client_bp.route("/appointment/<int:appt_id>/cancel", methods=["POST"])
-def cancel_appointment(appt_id: int):
-    appt = Appointment.query.get_or_404(appt_id)
+@client_bp.route("/<slug>/appointment/<int:appt_id>/cancel", methods=["POST"])
+def cancel_appointment(slug: str, appt_id: int):
+    unidade = resolver_unidade_por_slug(slug)
+    appt = Agendamento.query.filter_by(id=appt_id, unidade_id=unidade.id).first_or_404()
     cpf = request.form.get("cpf", "").strip()
 
     if not _verify_ownership(appt, cpf):
         flash("Acesso negado.", "danger")
-        return redirect(url_for("client.lookup"))
+        return redirect(url_for("client.lookup", slug=slug))
 
     if appt.status not in ("pending", "confirmed"):
         flash("Este agendamento não pode ser cancelado.", "warning")
     else:
-        from app.subscriptions.service import refund_credit
-        refund_credit(appt.id)
+        if SATELLITE_FEATURES_ENABLED:
+            from app.subscriptions.service import refund_credit
+            refund_credit(appt.id)
         appt.status = "cancelled"
         db.session.commit()
         flash("Agendamento cancelado.", "info")
 
-    return redirect(url_for("client.lookup"))
+    return redirect(url_for("client.lookup", slug=slug))
 
 
-@client_bp.route("/appointment/<int:appt_id>/reschedule", methods=["GET", "POST"])
-def reschedule_appointment(appt_id: int):
-    appt = Appointment.query.get_or_404(appt_id)
-    cpf = session.get("client_cpf", "") if request.method == "GET" else request.form.get("cpf", "").strip()
+@client_bp.route("/<slug>/appointment/<int:appt_id>/reschedule", methods=["GET", "POST"])
+def reschedule_appointment(slug: str, appt_id: int):
+    unidade = resolver_unidade_por_slug(slug)
+    appt = Agendamento.query.filter_by(id=appt_id, unidade_id=unidade.id).first_or_404()
+    cpf_key, _, _ = _session_keys(slug)
+    cpf = session.get(cpf_key, "") if request.method == "GET" else request.form.get("cpf", "").strip()
 
     if not _verify_ownership(appt, cpf):
         flash("Acesso negado.", "danger")
-        return redirect(url_for("client.lookup"))
+        return redirect(url_for("client.lookup", slug=slug))
 
     if appt.status not in ("pending", "confirmed"):
         flash("Este agendamento não pode ser remarcado.", "warning")
-        return redirect(url_for("client.lookup"))
+        return redirect(url_for("client.lookup", slug=slug))
 
-    barbers = Barber.query.filter_by(is_active=True).order_by(Barber.name).all()
+    # Lista de profissionais escopada à unidade (antes: Barber.query global) —
+    # ver ponto 4 combinado.
+    barbers = Profissional.query.filter_by(is_active=True, unidade_id=unidade.id).order_by(Profissional.name).all()
 
     if request.method == "POST":
         barber_id = request.form.get("barber_id", type=int)
@@ -206,11 +234,18 @@ def reschedule_appointment(appt_id: int):
         sched_time = None
 
         if not barber_id:
-            errors.append("Selecione um barbeiro.")
+            errors.append("Selecione um profissional.")
         if not date_str:
             errors.append("Selecione uma data.")
         if not time_str:
             errors.append("Selecione um horário.")
+
+        # barber_id vem do POST — confirma que pertence a esta unidade antes
+        # de usar (mesmo padrão de booking.book).
+        if not errors and not Profissional.query.filter_by(
+            id=barber_id, unidade_id=unidade.id, is_active=True
+        ).first():
+            errors.append("Profissional inválido para esta unidade.")
 
         if not errors:
             try:
@@ -224,7 +259,7 @@ def reschedule_appointment(appt_id: int):
 
         if not errors:
             if not is_slot_available(barber_id, appt.service_id, sched_date, sched_time,
-                                     exclude_appointment_id=appt.id, kit_id=appt.kit_id):
+                                     exclude_appointment_id=appt.id):
                 errors.append("Horário não disponível. Escolha outro slot.")
 
         if errors:
@@ -232,47 +267,53 @@ def reschedule_appointment(appt_id: int):
                 flash(e, "danger")
             return render_template(
                 "client/reschedule.html",
-                appt=appt, barbers=barbers, cpf=cpf,
+                unidade=unidade, appt=appt, barbers=barbers, cpf=cpf,
                 today=date.today(), selected_barber_id=barber_id,
                 selected_date=date_str, selected_time=time_str,
             )
 
-        from app.subscriptions.service import refund_credit, consume_credit, consume_credit_kit
-        had_credits = refund_credit(appt.id)
+        had_credits = False
+        if SATELLITE_FEATURES_ENABLED:
+            from app.subscriptions.service import refund_credit
+            had_credits = refund_credit(appt.id)
+
         appt.status = "cancelled"
-        new_appt = Appointment(
+        new_appt = Agendamento(
+            empresa_id=unidade.empresa_id,
+            unidade_id=unidade.id,
             customer_id=appt.customer_id,
             barber_id=barber_id,
             service_id=appt.service_id,
-            kit_id=appt.kit_id,
             scheduled_date=sched_date,
             scheduled_time=sched_time,
         )
         db.session.add(new_appt)
         db.session.flush()
 
-        if had_credits:
-            if appt.kit_id and appt.kit:
-                consume_credit_kit(appt.customer_id, appt.kit, new_appt.id)
-            else:
-                consume_credit(appt.customer_id, appt.service_id, new_appt.id)
+        if had_credits and SATELLITE_FEATURES_ENABLED:
+            from app.subscriptions.service import consume_credit
+            consume_credit(appt.customer_id, appt.service_id, new_appt.id)
 
         db.session.commit()
         flash("Agendamento remarcado com sucesso!", "success")
-        return redirect(url_for("client.lookup"))
+        return redirect(url_for("client.lookup", slug=slug))
 
     return render_template(
         "client/reschedule.html",
-        appt=appt, barbers=barbers, cpf=cpf,
+        unidade=unidade, appt=appt, barbers=barbers, cpf=cpf,
         today=date.today(),
         selected_barber_id=appt.barber_id,
         selected_date="", selected_time="",
     )
 
 
-@client_bp.route("/lookup/json")
-def lookup_json():
-    """AJAX endpoint: busca cliente por CPF e retorna agendamentos como JSON."""
+@client_bp.route("/<slug>/lookup/json")
+def lookup_json(slug: str):
+    """AJAX endpoint: busca cliente por CPF (nesta unidade/empresa) e
+    retorna agendamentos como JSON."""
+    unidade = resolver_unidade_por_slug(slug)
+    cpf_key, from_key, to_key = _session_keys(slug)
+
     cpf_input = request.args.get("cpf", "").strip()
     date_from = request.args.get("date_from", "").strip()
     date_to = request.args.get("date_to", "").strip()
@@ -284,14 +325,14 @@ def lookup_json():
         return jsonify({"error": "CPF inválido. Verifique o número."})
 
     formatted = _format_cpf(cpf_input)
-    customer = Customer.query.filter_by(cpf=formatted).first()
+    customer = Cliente.query.filter_by(cpf=formatted).first()
 
     if not customer:
         return jsonify({"error": "CPF não encontrado. Verifique o número ou realize um agendamento."})
 
-    session["client_cpf"] = formatted
-    session["client_date_from"] = date_from
-    session["client_date_to"] = date_to
+    session[cpf_key] = formatted
+    session[from_key] = date_from
+    session[to_key] = date_to
 
     appointments = _load_appointments(customer, date_from, date_to)
     today = date.today()
@@ -312,8 +353,8 @@ def lookup_json():
                 "end_time": a.end_time_str or "",
                 "barber_name": a.barber.name if a.barber else "—",
                 "barber_whatsapp_link": a.barber.whatsapp_link if a.barber else None,
-                "service_name": (a.kit.name if a.kit else (a.service.name if a.service else "—")),
-                "service_price": (a.kit.price_formatted if a.kit else (a.service.price_formatted if a.service else "—")),
+                "service_name": a.service.name if a.service else "—",
+                "service_price": a.service.price_formatted if a.service else "—",
                 "is_past": a.scheduled_date < today,
                 "can_act": a.status in ("pending", "confirmed") and a.scheduled_date >= today,
                 "can_confirm": a.status == "pending" and a.scheduled_date >= today,
@@ -323,16 +364,23 @@ def lookup_json():
     })
 
 
-@client_bp.route("/slots")
-def slots():
+@client_bp.route("/<slug>/slots")
+def slots(slug: str):
+    unidade = resolver_unidade_por_slug(slug)
+
     barber_id  = request.args.get("barber_id",  type=int)
     service_id = request.args.get("service_id", type=int)
-    kit_id     = request.args.get("kit_id",     type=int)
     date_str   = request.args.get("date", "")
     exclude_id = request.args.get("exclude_id", type=int)
 
-    if not barber_id or not date_str or (not service_id and not kit_id):
+    if not barber_id or not date_str or not service_id:
         return jsonify({"slots": []})
+
+    # barber_id vem de query string pública — confirma que é desta unidade
+    # antes de calcular disponibilidade (ver ponto 5 combinado).
+    if not Profissional.query.filter_by(id=barber_id, unidade_id=unidade.id).first():
+        return jsonify({"slots": []})
+
     try:
         target_date = date.fromisoformat(date_str)
     except ValueError:
@@ -340,6 +388,5 @@ def slots():
     if target_date < date.today():
         return jsonify({"slots": []})
 
-    available = get_available_slots(barber_id, service_id, target_date,
-                                    exclude_appointment_id=exclude_id, kit_id=kit_id)
+    available = get_available_slots(barber_id, service_id, target_date, exclude_appointment_id=exclude_id)
     return jsonify({"slots": [t.strftime("%H:%M") for t in available]})
