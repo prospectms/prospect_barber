@@ -1,12 +1,13 @@
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, g
 from flask_login import login_required, current_user
 from datetime import date, timedelta
 from sqlalchemy import func
 from app.extensions import db
-from app.models.appointment import Appointment
-from app.models.customer import Customer
-from app.models.barber import Barber
-from app.models.service import Service
+from app.models.agendamento import Agendamento
+from app.models.cliente import Cliente
+from app.models.profissional import Profissional
+from app.models.servico import Servico
+from app.utils.decorators import requer_unidade
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -26,20 +27,23 @@ def _fmt_brl(value: float) -> str:
 
 @dashboard_bp.route("/")
 @login_required
+@requer_unidade
 def index():
     today = date.today()
     month_start = today.replace(day=1)
+    unidade_id = g.unidade_id
 
-    # Scope: admin sees everything; barber sees only own data
+    # Escopo: dono/gerente vê a unidade ativa inteira; funcionário só a
+    # própria agenda dentro dela.
     barber_id = None
-    if current_user.is_barber and current_user.barber_profile:
-        barber_id = current_user.barber_profile.id
+    if not current_user.pode_gerenciar and current_user.profissional:
+        barber_id = current_user.profissional.id
 
-    stats = _build_stats(today, month_start, barber_id)
-    weekly = _weekly_revenue(barber_id)
-    upcoming = _upcoming_appointments(today, barber_id)
-    top_barbers = _top_barbers(month_start) if current_user.is_admin else []
-    top_services = _top_services(month_start, barber_id)
+    stats = _build_stats(today, month_start, unidade_id, barber_id)
+    weekly = _weekly_revenue(unidade_id, barber_id)
+    upcoming = _upcoming_appointments(today, unidade_id, barber_id)
+    top_barbers = _top_barbers(month_start, unidade_id) if current_user.pode_gerenciar else []
+    top_services = _top_services(month_start, unidade_id, barber_id)
 
     today_label = (
         f"{_WEEKDAYS_PT[today.weekday()].capitalize()}, "
@@ -62,55 +66,55 @@ def index():
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
-def _build_stats(today, month_start, barber_id=None) -> dict:
+def _build_stats(today, month_start, unidade_id, barber_id=None) -> dict:
     """
     All KPI numbers for the cards.
-    barber_id=None → global (admin view).
-    barber_id set  → filtered to that barber only.
+    barber_id=None → visão da unidade inteira (dono/gerente).
+    barber_id set  → filtrado para aquele profissional (funcionário).
     """
 
     def _count(*filters):
-        q = Appointment.query
+        q = Agendamento.query.filter(Agendamento.unidade_id == unidade_id)
         if barber_id:
-            q = q.filter(Appointment.barber_id == barber_id)
+            q = q.filter(Agendamento.barber_id == barber_id)
         for f in filters:
             q = q.filter(f)
         return q.count()
 
     def _revenue(*filters):
-        """Sum of Service.price for completed appointments."""
+        """Sum of Servico.price para agendamentos concluídos."""
         q = (
-            db.session.query(func.sum(Service.price))
-            .join(Appointment, Appointment.service_id == Service.id)
-            .filter(Appointment.status == "completed")
+            db.session.query(func.sum(Servico.price))
+            .join(Agendamento, Agendamento.service_id == Servico.id)
+            .filter(Agendamento.unidade_id == unidade_id, Agendamento.status == "completed")
         )
         if barber_id:
-            q = q.filter(Appointment.barber_id == barber_id)
+            q = q.filter(Agendamento.barber_id == barber_id)
         for f in filters:
             q = q.filter(f)
         return float(q.scalar() or 0)
 
-    today_total     = _count(Appointment.scheduled_date == today)
+    today_total     = _count(Agendamento.scheduled_date == today)
     today_pending   = _count(
-        Appointment.scheduled_date == today,
-        Appointment.status.in_(["pending", "confirmed"]),
+        Agendamento.scheduled_date == today,
+        Agendamento.status.in_(["pending", "confirmed"]),
     )
     today_completed = _count(
-        Appointment.scheduled_date == today,
-        Appointment.status == "completed",
+        Agendamento.scheduled_date == today,
+        Agendamento.status == "completed",
     )
-    today_revenue   = _revenue(Appointment.scheduled_date == today)
-    month_revenue   = _revenue(Appointment.scheduled_date >= month_start)
+    today_revenue   = _revenue(Agendamento.scheduled_date == today)
+    month_revenue   = _revenue(Agendamento.scheduled_date >= month_start)
 
     # Completion rate = completed / (completed + cancelled + no_show) this month
     # Excludes still-pending/confirmed appointments to avoid penalising future slots
     month_closed = _count(
-        Appointment.scheduled_date >= month_start,
-        Appointment.status.in_(["completed", "cancelled", "no_show"]),
+        Agendamento.scheduled_date >= month_start,
+        Agendamento.status.in_(["completed", "cancelled", "no_show"]),
     )
     month_completed = _count(
-        Appointment.scheduled_date >= month_start,
-        Appointment.status == "completed",
+        Agendamento.scheduled_date >= month_start,
+        Agendamento.status == "completed",
     )
     completion_rate = round(
         (month_completed / month_closed * 100) if month_closed else 0, 1
@@ -118,8 +122,11 @@ def _build_stats(today, month_start, barber_id=None) -> dict:
 
     avg_ticket = (today_revenue / today_completed) if today_completed else 0
 
-    total_customers = Customer.query.count() if not barber_id else None
-    active_barbers  = Barber.query.filter_by(is_active=True).count() if not barber_id else None
+    total_customers = Cliente.query.count() if not barber_id else None
+    active_barbers = (
+        Profissional.query.filter_by(is_active=True, unidade_id=unidade_id).count()
+        if not barber_id else None
+    )
 
     return {
         "today_total":       today_total,
@@ -137,7 +144,7 @@ def _build_stats(today, month_start, barber_id=None) -> dict:
     }
 
 
-def _weekly_revenue(barber_id=None) -> dict:
+def _weekly_revenue(unidade_id, barber_id=None) -> dict:
     """Daily completed revenue for the last 7 days (including today)."""
     today = date.today()
     labels, values = [], []
@@ -145,56 +152,59 @@ def _weekly_revenue(barber_id=None) -> dict:
         day = today - timedelta(days=i)
         labels.append(day.strftime("%d/%m"))
         q = (
-            db.session.query(func.sum(Service.price))
-            .join(Appointment, Appointment.service_id == Service.id)
+            db.session.query(func.sum(Servico.price))
+            .join(Agendamento, Agendamento.service_id == Servico.id)
             .filter(
-                Appointment.scheduled_date == day,
-                Appointment.status == "completed",
+                Agendamento.unidade_id == unidade_id,
+                Agendamento.scheduled_date == day,
+                Agendamento.status == "completed",
             )
         )
         if barber_id:
-            q = q.filter(Appointment.barber_id == barber_id)
+            q = q.filter(Agendamento.barber_id == barber_id)
         values.append(float(q.scalar() or 0))
     return {"labels": labels, "amounts": values}
 
 
-def _upcoming_appointments(today, barber_id=None):
+def _upcoming_appointments(today, unidade_id, barber_id=None):
     """Next 8 pending/confirmed appointments from today onwards."""
-    q = Appointment.query.filter(
-        Appointment.scheduled_date >= today,
-        Appointment.status.in_(["pending", "confirmed"]),
+    q = Agendamento.query.filter(
+        Agendamento.unidade_id == unidade_id,
+        Agendamento.scheduled_date >= today,
+        Agendamento.status.in_(["pending", "confirmed"]),
     )
     if barber_id:
-        q = q.filter(Appointment.barber_id == barber_id)
+        q = q.filter(Agendamento.barber_id == barber_id)
     return (
-        q.order_by(Appointment.scheduled_date, Appointment.scheduled_time)
+        q.order_by(Agendamento.scheduled_date, Agendamento.scheduled_time)
         .limit(8)
         .all()
     )
 
 
-def _top_barbers(month_start) -> list:
-    """Top 5 barbers by completed appointment count this month (admin only)."""
+def _top_barbers(month_start, unidade_id) -> list:
+    """Top 5 barbers by completed appointment count this month (dono/gerente)."""
     rows = (
         db.session.query(
-            Barber,
-            func.count(Appointment.id).label("cnt"),
-            func.coalesce(func.sum(Service.price), 0).label("revenue"),
+            Profissional,
+            func.count(Agendamento.id).label("cnt"),
+            func.coalesce(func.sum(Servico.price), 0).label("revenue"),
         )
-        .join(Appointment, Appointment.barber_id == Barber.id)
-        .join(Service, Service.id == Appointment.service_id)
+        .join(Agendamento, Agendamento.barber_id == Profissional.id)
+        .join(Servico, Servico.id == Agendamento.service_id)
         .filter(
-            Appointment.status == "completed",
-            Appointment.scheduled_date >= month_start,
+            Agendamento.unidade_id == unidade_id,
+            Agendamento.status == "completed",
+            Agendamento.scheduled_date >= month_start,
         )
-        .group_by(Barber.id)
-        .order_by(func.count(Appointment.id).desc())
+        .group_by(Profissional.id)
+        .order_by(func.count(Agendamento.id).desc())
         .limit(5)
         .all()
     )
     return [
         {
-            "barber":      r.Barber,
+            "barber":      r[0],
             "cnt":         r.cnt,
             "revenue":     float(r.revenue),
             "revenue_fmt": _fmt_brl(float(r.revenue)),
@@ -203,31 +213,32 @@ def _top_barbers(month_start) -> list:
     ]
 
 
-def _top_services(month_start, barber_id=None) -> list:
+def _top_services(month_start, unidade_id, barber_id=None) -> list:
     """Top 6 services by completed appointment count this month."""
     q = (
         db.session.query(
-            Service,
-            func.count(Appointment.id).label("cnt"),
-            func.coalesce(func.sum(Service.price), 0).label("revenue"),
+            Servico,
+            func.count(Agendamento.id).label("cnt"),
+            func.coalesce(func.sum(Servico.price), 0).label("revenue"),
         )
-        .join(Appointment, Appointment.service_id == Service.id)
+        .join(Agendamento, Agendamento.service_id == Servico.id)
         .filter(
-            Appointment.status == "completed",
-            Appointment.scheduled_date >= month_start,
+            Agendamento.unidade_id == unidade_id,
+            Agendamento.status == "completed",
+            Agendamento.scheduled_date >= month_start,
         )
     )
     if barber_id:
-        q = q.filter(Appointment.barber_id == barber_id)
+        q = q.filter(Agendamento.barber_id == barber_id)
     rows = (
-        q.group_by(Service.id)
-        .order_by(func.count(Appointment.id).desc())
+        q.group_by(Servico.id)
+        .order_by(func.count(Agendamento.id).desc())
         .limit(6)
         .all()
     )
     return [
         {
-            "service":     r.Service,
+            "service":     r[0],
             "cnt":         r.cnt,
             "revenue":     float(r.revenue),
             "revenue_fmt": _fmt_brl(float(r.revenue)),

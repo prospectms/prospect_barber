@@ -2,11 +2,11 @@ from datetime import date
 
 from flask import (
     Blueprint, render_template, request,
-    send_file, flash, redirect, url_for,
+    send_file, flash, redirect, url_for, g,
 )
 from flask_login import login_required
 
-from app.utils.decorators import admin_required
+from app.utils.decorators import requer_papel, requer_unidade
 from app.reports.generators import (
     build_appointments, build_revenue,
     build_services, build_barbers,
@@ -31,7 +31,8 @@ _MIMETYPES = {
 
 @reports_bp.route("/")
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@requer_unidade
 def index():
     today = date.today()
     month_start = today.replace(day=1)
@@ -44,7 +45,8 @@ def index():
 
 @reports_bp.route("/export")
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@requer_unidade
 def export():
     report_type = request.args.get("report", "appointments")
     fmt         = request.args.get("fmt", "xlsx").lower()
@@ -77,8 +79,9 @@ def export():
         flash("A data inicial não pode ser posterior à data final.", "warning")
         return redirect(url_for("reports.index"))
 
-    # Constrói dados do relatório
-    report_data = builder(date_from, date_to)
+    # Constrói dados do relatório — escopado à unidade ativa (agenda/receita
+    # são operacionais por unidade, ver dashboard).
+    report_data = builder(date_from, date_to, g.unidade_id)
 
     # Gera arquivo
     try:
@@ -104,7 +107,8 @@ def export():
 # Mantém compatibilidade com referências antigas ao endpoint export_appointments
 @reports_bp.route("/appointments/export")
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@requer_unidade
 def export_appointments():
     return redirect(url_for(
         "reports.export",

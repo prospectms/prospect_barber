@@ -24,16 +24,17 @@ def _period_str(d_from: date, d_to: date) -> str:
 #   title, subtitle, sheet_name, filename, headers, rows, totals,
 #   money_cols (0-indexed), col_widths (relativos), landscape
 
-def build_appointments(date_from: date, date_to: date) -> dict:
-    from app.models.appointment import Appointment
+def build_appointments(date_from: date, date_to: date, unidade_id: int) -> dict:
+    from app.models.agendamento import Agendamento
 
     appts = (
-        Appointment.query
+        Agendamento.query
         .filter(
-            Appointment.scheduled_date >= date_from,
-            Appointment.scheduled_date <= date_to,
+            Agendamento.unidade_id == unidade_id,
+            Agendamento.scheduled_date >= date_from,
+            Agendamento.scheduled_date <= date_to,
         )
-        .order_by(Appointment.scheduled_date, Appointment.scheduled_time)
+        .order_by(Agendamento.scheduled_date, Agendamento.scheduled_time)
         .all()
     )
 
@@ -70,16 +71,17 @@ def build_appointments(date_from: date, date_to: date) -> dict:
     }
 
 
-def build_revenue(date_from: date, date_to: date) -> dict:
-    from app.models.appointment import Appointment
+def build_revenue(date_from: date, date_to: date, unidade_id: int) -> dict:
+    from app.models.agendamento import Agendamento
 
     appts = (
-        Appointment.query
+        Agendamento.query
         .filter(
-            Appointment.scheduled_date >= date_from,
-            Appointment.scheduled_date <= date_to,
+            Agendamento.unidade_id == unidade_id,
+            Agendamento.scheduled_date >= date_from,
+            Agendamento.scheduled_date <= date_to,
         )
-        .order_by(Appointment.scheduled_date)
+        .order_by(Agendamento.scheduled_date)
         .all()
     )
 
@@ -136,15 +138,16 @@ def build_revenue(date_from: date, date_to: date) -> dict:
     }
 
 
-def build_services(date_from: date, date_to: date) -> dict:
-    from app.models.appointment import Appointment
+def build_services(date_from: date, date_to: date, unidade_id: int) -> dict:
+    from app.models.agendamento import Agendamento
 
     appts = (
-        Appointment.query
+        Agendamento.query
         .filter(
-            Appointment.status == "completed",
-            Appointment.scheduled_date >= date_from,
-            Appointment.scheduled_date <= date_to,
+            Agendamento.unidade_id == unidade_id,
+            Agendamento.status == "completed",
+            Agendamento.scheduled_date >= date_from,
+            Agendamento.scheduled_date <= date_to,
         )
         .all()
     )
@@ -186,14 +189,15 @@ def build_services(date_from: date, date_to: date) -> dict:
     }
 
 
-def build_barbers(date_from: date, date_to: date) -> dict:
-    from app.models.appointment import Appointment
+def build_barbers(date_from: date, date_to: date, unidade_id: int) -> dict:
+    from app.models.agendamento import Agendamento
 
     appts = (
-        Appointment.query
+        Agendamento.query
         .filter(
-            Appointment.scheduled_date >= date_from,
-            Appointment.scheduled_date <= date_to,
+            Agendamento.unidade_id == unidade_id,
+            Agendamento.scheduled_date >= date_from,
+            Agendamento.scheduled_date <= date_to,
         )
         .all()
     )
