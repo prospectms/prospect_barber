@@ -1,17 +1,18 @@
 from app.extensions import db
+from app.models.tenant import TenantMixin
 
 
-class UsuarioUnidade(db.Model):
+class UsuarioUnidade(TenantMixin, db.Model):
     """Vínculo funcionário↔unidade. Dono/gerente não precisam de linha aqui —
     eles acessam todas as unidades da própria empresa por papel; este vínculo
     existe para restringir funcionário às unidades listadas explicitamente.
+
+    Herda TenantMixin pela mesma razão de Unidade (ver unidade.py): consistência
+    — nenhum model de tenant fica de fora da proteção automática por padrão.
     """
     __tablename__ = "usuario_unidade"
 
     id = db.Column(db.Integer, primary_key=True)
-    empresa_id = db.Column(
-        db.Integer, db.ForeignKey("empresas.id"), nullable=False, index=True
-    )
     usuario_id = db.Column(
         db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
     )
