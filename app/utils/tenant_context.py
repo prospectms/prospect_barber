@@ -41,3 +41,25 @@ def usuario_pode_acessar_unidade(usuario, unidade_id: int) -> bool:
         .first()
         is not None
     )
+
+
+def resolver_unidade_por_slug(slug: str) -> Unidade:
+    """Resolve Unidade por slug para rotas PÚBLICAS (agenda por unidade,
+    portal do cliente) — não exigem login.
+
+    Essas rotas rodam sem sessão autenticada, então o before_request global
+    (app/__init__.py) não popula g.empresa_id/g.unidade_id sozinho. É este
+    helper que faz isso a partir do slug da URL — a partir daqui, toda
+    leitura de model TenantMixin nessa request já sai filtrada para a
+    empresa da unidade resolvida, sem precisar repetir o filtro manualmente.
+
+    404 se o slug não existir ou a unidade estiver inativa — nunca 403,
+    para não revelar a um visitante anônimo se um slug "quase certo" existe.
+    """
+    from flask import g, abort
+    unidade = Unidade.query.filter_by(slug=slug, ativa=True).first()
+    if not unidade:
+        abort(404)
+    g.empresa_id = unidade.empresa_id
+    g.unidade_id = unidade.id
+    return unidade
