@@ -4,7 +4,7 @@ from logging.handlers import RotatingFileHandler
 from flask import Flask, render_template, redirect, url_for, flash
 from flask_login import current_user, logout_user
 from app.config import config
-from app.extensions import db, login_manager, csrf
+from app.extensions import db, login_manager, csrf, migrate
 
 
 def create_app(config_name: str = "default") -> Flask:
@@ -14,6 +14,7 @@ def create_app(config_name: str = "default") -> Flask:
     db.init_app(app)
     login_manager.init_app(app)
     csrf.init_app(app)
+    migrate.init_app(app, db)
 
     _configure_logging(app)
     _register_blueprints(app)
@@ -24,7 +25,8 @@ def create_app(config_name: str = "default") -> Flask:
     _register_shell_context(app)
     _register_context_processors(app)
     _register_template_filters(app)
-    _ensure_schema(app)
+    # _ensure_schema(app) — CONGELADO na Fase 1-A. Ver docstring da função:
+    # substituído por Flask-Migrate/Alembic (comando `flask db upgrade`).
 
     return app
 
@@ -155,7 +157,18 @@ def _register_template_filters(app: Flask) -> None:
 
 
 def _ensure_schema(app: Flask) -> None:
-    """Adiciona colunas novas sem quebrar tabelas existentes (SQLite sem Alembic)."""
+    """
+    CONGELADA desde a Fase 1-A (multi-tenancy) — não é mais chamada em create_app().
+
+    Mecanismo antigo (pré-Alembic) que adicionava colunas via ALTER TABLE ad-hoc,
+    engolindo qualquer erro. Não sabe criar tabelas novas, FKs, constraints de
+    unicidade composta nem fazer backfill de dados — por isso não dava conta da
+    migração estrutural da Fase 1-A (empresas/unidades + empresa_id/unidade_id
+    em todo model de tenant). Ver relatório de investigação da Fase 0, item 4.
+
+    Substituída por Flask-Migrate/Alembic: `flask db upgrade` aplica o schema
+    atual. Função mantida apenas como referência histórica — não remover.
+    """
     with app.app_context():
         from sqlalchemy import inspect, text
         db.create_all()
