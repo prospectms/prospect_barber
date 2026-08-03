@@ -38,17 +38,21 @@ class ServiceForm(FlaskForm):
     )
     is_active = BooleanField("Serviço ativo")
 
-    def __init__(self, service_id=None, *args, **kwargs):
+    def __init__(self, unidade_id: int = None, service_id=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._unidade_id = unidade_id
         self._service_id = service_id
 
     def validate_name(self, field):
-        from app.models.service import Service
+        """Nome único por unidade (não por empresa) — duas unidades da mesma
+        empresa podem ter serviços com nome igual e preço/duração diferentes."""
+        from app.models.servico import Servico
         from app.extensions import db
-        query = Service.query.filter(
-            db.func.lower(Service.name) == field.data.strip().lower()
+        query = Servico.query.filter(
+            Servico.unidade_id == self._unidade_id,
+            db.func.lower(Servico.name) == field.data.strip().lower(),
         )
         if self._service_id:
-            query = query.filter(Service.id != self._service_id)
+            query = query.filter(Servico.id != self._service_id)
         if query.first():
-            raise ValidationError("Já existe um serviço com este nome.")
+            raise ValidationError("Já existe um serviço com este nome nesta unidade.")

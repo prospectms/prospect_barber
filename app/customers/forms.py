@@ -60,14 +60,17 @@ class CustomerForm(FlaskForm):
         self._customer_id = customer_id
 
     def validate_phone(self, field):
-        """Rejeita telefone se já existir outro cliente com os mesmos dígitos."""
+        """Rejeita telefone se já existir outro cliente DA MESMA EMPRESA com os
+        mesmos dígitos. Cliente.query já vem filtrado por empresa_id
+        (TenantMixin) — duas empresas podem ter clientes com telefones iguais
+        sem colisão."""
         if not field.data or not field.data.strip():
             return
         digits = _digits(field.data)
         if not digits:
             return
-        from app.models.customer import Customer
-        for c in Customer.query.filter(Customer.phone.isnot(None)).all():
+        from app.models.cliente import Cliente
+        for c in Cliente.query.filter(Cliente.phone.isnot(None)).all():
             if self._customer_id and c.id == self._customer_id:
                 continue
             if _digits(c.phone) == digits:
@@ -81,9 +84,10 @@ class CustomerForm(FlaskForm):
             return
         if not _validate_cpf_digits(field.data):
             raise ValidationError("CPF inválido. Verifique os dígitos verificadores.")
-        from app.models.customer import Customer
+        from app.models.cliente import Cliente
         clean = re.sub(r'\D', '', field.data)
         formatted = f'{clean[:3]}.{clean[3:6]}.{clean[6:9]}-{clean[9:]}'
-        existing = Customer.query.filter_by(cpf=formatted).first()
+        # Único por empresa, não global — mesmo CPF pode existir em outra empresa.
+        existing = Cliente.query.filter_by(cpf=formatted).first()
         if existing and (not self._customer_id or existing.id != self._customer_id):
             raise ValidationError(f"CPF já cadastrado para '{existing.name}'.")
