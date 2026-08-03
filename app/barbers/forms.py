@@ -2,11 +2,11 @@ from datetime import datetime
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import (
-    StringField, PasswordField, TextAreaField,
+    StringField, TextAreaField,
     BooleanField, SubmitField, SelectField, DateField,
 )
 from wtforms.validators import (
-    DataRequired, Email, Length, EqualTo, Optional, ValidationError,
+    DataRequired, Length, Optional, ValidationError,
 )
 
 
@@ -14,24 +14,18 @@ def _parse_time(value: str):
     return datetime.strptime(value.strip(), "%H:%M").time()
 
 
-# ── Formulário de criação (admin cria usuário + perfil barbeiro) ──────────────
+# ── Formulário de criação (perfil profissional — login é vínculo à parte) ─────
 class CreateBarberForm(FlaskForm):
+    """Cria um Profissional. Não pede credenciais de login — usuario_id é
+    nullable desde a Fase 1-A (relaxado de propósito: um profissional pode
+    existir só para aparecer na agenda, sem conta própria). Vínculo com um
+    Usuario existente é opcional, feito em `usuario_id` (contas da empresa
+    que ainda não têm perfil profissional — ver auth.new_user para criar
+    login+perfil junto)."""
 
-    username = StringField(
-        "Usuário (login)",
-        validators=[DataRequired(), Length(3, 64, message="Entre 3 e 64 caracteres.")],
-    )
-    email = StringField(
-        "E-mail",
-        validators=[DataRequired(), Email(message="E-mail inválido.")],
-    )
-    password = PasswordField(
-        "Senha",
-        validators=[DataRequired(), Length(6, 128, message="Mínimo 6 caracteres.")],
-    )
-    confirm_password = PasswordField(
-        "Confirmar senha",
-        validators=[DataRequired(), EqualTo("password", message="As senhas não coincidem.")],
+    usuario_id = SelectField(
+        "Vincular a um usuário existente (opcional)",
+        coerce=int, validators=[Optional()],
     )
 
     name = StringField(
@@ -49,29 +43,34 @@ class CreateBarberForm(FlaskForm):
     lunch_end = StringField("Fim do almoço", validators=[Optional()])
 
     photo = FileField(
-        "Foto do barbeiro",
+        "Foto do profissional",
         validators=[FileAllowed(["jpg", "jpeg", "png", "webp", "gif"], "Apenas imagens.")],
     )
 
-    submit = SubmitField("Cadastrar barbeiro")
+    submit = SubmitField("Cadastrar profissional")
 
-    def validate_username(self, field):
-        from app.models.user import User
-        if User.query.filter_by(username=field.data.strip()).first():
-            raise ValidationError("Este nome de usuário já está em uso.")
+    def __init__(self, unidade_id: int = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._unidade_id = unidade_id
 
-    def validate_email(self, field):
-        from app.models.user import User
-        if User.query.filter_by(email=field.data.strip()).first():
-            raise ValidationError("Este e-mail já está cadastrado.")
+    def validate_usuario_id(self, field):
+        if not field.data:
+            return
+        from app.models.usuario import Usuario
+        usuario = Usuario.query.get(field.data)
+        if not usuario:
+            raise ValidationError("Usuário inválido.")
+        if usuario.profissional:
+            raise ValidationError("Este usuário já tem um perfil de profissional vinculado.")
 
     def validate_name(self, field):
-        from app.models.barber import Barber
+        from app.models.profissional import Profissional
         from app.extensions import db
-        if Barber.query.filter(
-            db.func.lower(Barber.name) == field.data.strip().lower()
+        if Profissional.query.filter(
+            Profissional.unidade_id == self._unidade_id,
+            db.func.lower(Profissional.name) == field.data.strip().lower(),
         ).first():
-            raise ValidationError("Já existe um barbeiro com este nome.")
+            raise ValidationError("Já existe um profissional com este nome nesta unidade.")
 
     def validate_work_start_time(self, field):
         if not field.data:
@@ -144,23 +143,25 @@ class EditBarberForm(FlaskForm):
         validators=[FileAllowed(["jpg", "jpeg", "png", "webp", "gif"], "Apenas imagens.")],
     )
     remove_photo = BooleanField("Remover foto atual")
-    is_active = BooleanField("Barbeiro ativo")
+    is_active = BooleanField("Profissional ativo")
 
     submit = SubmitField("Salvar alterações")
 
-    def __init__(self, barber_id: int = None, *args, **kwargs):
+    def __init__(self, barber_id: int = None, unidade_id: int = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._barber_id = barber_id
+        self._unidade_id = unidade_id
 
     def validate_name(self, field):
-        from app.models.barber import Barber
+        from app.models.profissional import Profissional
         from app.extensions import db
-        existing = Barber.query.filter(
-            db.func.lower(Barber.name) == field.data.strip().lower(),
-            Barber.id != self._barber_id,
+        existing = Profissional.query.filter(
+            Profissional.unidade_id == self._unidade_id,
+            db.func.lower(Profissional.name) == field.data.strip().lower(),
+            Profissional.id != self._barber_id,
         ).first()
         if existing:
-            raise ValidationError("Já existe um barbeiro com este nome.")
+            raise ValidationError("Já existe um profissional com este nome nesta unidade.")
 
     def validate_work_start_time(self, field):
         if not field.data:

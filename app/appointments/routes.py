@@ -1,25 +1,39 @@
 from datetime import date, datetime, timezone, timedelta
 from flask import (
     Blueprint, render_template, redirect, url_for,
-    flash, request, jsonify,
+    flash, request, jsonify, g,
 )
 from flask_login import login_required, current_user
-from sqlalchemy import func
 from app.extensions import db
-from app.models.appointment import Appointment, APPOINTMENT_STATUSES
-from app.models.barber import Barber
-from app.models.customer import Customer
-from app.models.service import Service
-from app.appointments.forms import AppointmentAdminForm, BookingForm
+from app.models.agendamento import Agendamento, APPOINTMENT_STATUSES
+from app.models.profissional import Profissional
+from app.models.cliente import Cliente
+from app.models.servico import Servico
+from app.appointments.forms import AppointmentAdminForm
 from app.appointments.availability import get_available_slots, is_slot_available
-from app.utils.decorators import admin_required
+from app.utils.decorators import requer_papel, requer_unidade
+from app.utils.feature_flags import SATELLITE_FEATURES_ENABLED
 
 appointments_bp = Blueprint("appointments", __name__)
 
+# NOTA: as rotas públicas de agendamento (book/slots/book_success) que existiam
+# aqui foram removidas deste blueprint — vão para app/booking (agenda pública
+# por slug de unidade, /agendar/<slug>), ainda não criado. Até lá, não há rota
+# pública de agendamento no ar; só o fluxo autenticado abaixo.
 
-# ── Admin / Barber: Listagem ──────────────────────────────────────────────────
+
+def _minha_profissional_id():
+    """ID do Profissional vinculado ao usuário logado, se houver e ele não for
+    dono/gerente (que enxergam a agenda inteira da unidade, não só a própria)."""
+    if current_user.pode_gerenciar:
+        return None
+    return current_user.profissional.id if current_user.profissional else None
+
+
+# ── Admin / Funcionário: Listagem ─────────────────────────────────────────────
 @appointments_bp.route("/")
 @login_required
+@requer_unidade
 def index():
     date_str      = request.args.get("date", str(date.today()))
     status_filter = request.args.get("status", "")
@@ -31,37 +45,41 @@ def index():
         filter_date = date.today()
         date_str = str(filter_date)
 
-    query = Appointment.query.filter_by(scheduled_date=filter_date)
+    # empresa_id já vem automático (TenantMixin); unidade_id é manual —
+    # a agenda mostra a unidade ativa, não a empresa inteira de uma vez.
+    query = Agendamento.query.filter_by(scheduled_date=filter_date, unidade_id=g.unidade_id)
 
-    if current_user.is_barber and current_user.barber_profile:
-        query = query.filter_by(barber_id=current_user.barber_profile.id)
-    elif current_user.is_admin and barber_filter:
+    minha_profissional_id = _minha_profissional_id()
+    if minha_profissional_id:
+        query = query.filter_by(barber_id=minha_profissional_id)
+    elif current_user.pode_gerenciar and barber_filter:
         query = query.filter_by(barber_id=barber_filter)
 
     if status_filter:
         query = query.filter_by(status=status_filter)
 
-    appointments = query.order_by(Appointment.scheduled_time).all()
+    appointments = query.order_by(Agendamento.scheduled_time).all()
 
     today = date.today()
-    today_q = Appointment.query.filter_by(scheduled_date=today)
-    if current_user.is_barber and current_user.barber_profile:
-        today_q = today_q.filter_by(barber_id=current_user.barber_profile.id)
+    today_q = Agendamento.query.filter_by(scheduled_date=today, unidade_id=g.unidade_id)
+    if minha_profissional_id:
+        today_q = today_q.filter_by(barber_id=minha_profissional_id)
 
     stats = {
         "today_total":     today_q.count(),
         "today_pending":   today_q.filter(
-                               Appointment.status.in_(["pending", "confirmed"])
+                               Agendamento.status.in_(["pending", "confirmed"])
                            ).count(),
         "today_completed": today_q.filter_by(status="completed").count(),
         "today_cancelled": today_q.filter(
-                               Appointment.status.in_(["cancelled", "no_show"])
+                               Agendamento.status.in_(["cancelled", "no_show"])
                            ).count(),
     }
 
     barbers = (
-        Barber.query.filter_by(is_active=True).order_by(Barber.name).all()
-        if current_user.is_admin else []
+        Profissional.query.filter_by(is_active=True, unidade_id=g.unidade_id)
+        .order_by(Profissional.name).all()
+        if current_user.pode_gerenciar else []
     )
 
     prev_date = str(filter_date - timedelta(days=1))
@@ -85,16 +103,16 @@ def index():
 # ── Admin: Criar agendamento ──────────────────────────────────────────────────
 @appointments_bp.route("/new", methods=["GET", "POST"])
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@requer_unidade
 def new():
-    from app.models.service_kit import ServiceKit
-
     form = AppointmentAdminForm()
 
-    customers = Customer.query.order_by(Customer.name).all()
-    barbers   = Barber.query.filter_by(is_active=True).order_by(Barber.name).all()
-    services  = Service.query.filter_by(is_active=True).order_by(Service.name).all()
-    kits      = ServiceKit.query.filter_by(active=True).order_by(ServiceKit.name).all()
+    customers = Cliente.query.order_by(Cliente.name).all()
+    barbers   = Profissional.query.filter_by(is_active=True, unidade_id=g.unidade_id).order_by(Profissional.name).all()
+    services  = Servico.query.filter_by(is_active=True, unidade_id=g.unidade_id).order_by(Servico.name).all()
+    # Kits de serviço ficam fora do ar na Fase 1-A (ver app/utils/feature_flags.py)
+    kits = []
 
     form.customer_id.choices = [
         (c.id, f"{c.name}" + (f"  ·  {c.phone}" if c.phone else ""))
@@ -109,54 +127,41 @@ def new():
     if not customers:
         flash("Cadastre ao menos um cliente antes de criar um agendamento.", "warning")
     if not barbers:
-        flash("Não há barbeiros ativos. Ative um barbeiro primeiro.", "warning")
-    if not services and not kits:
-        flash("Não há serviços nem kits ativos.", "warning")
+        flash("Não há profissionais ativos nesta unidade. Cadastre um primeiro.", "warning")
+    if not services:
+        flash("Não há serviços ativos nesta unidade.", "warning")
 
     if form.validate_on_submit():
-        kit_id_raw = request.form.get("kit_id", "").strip()
-        kit_id = int(kit_id_raw) if kit_id_raw else None
         service_id = form.service_id.data or None
 
         sched_date = form.scheduled_date.data
         sched_time = datetime.strptime(form.scheduled_time.data.strip(), "%H:%M").time()
 
-        kit = None
-        if kit_id:
-            kit = ServiceKit.query.get(kit_id)
-            if not kit:
-                flash("Kit inválido.", "danger")
-                return render_template("appointments/form.html", form=form,
-                                       barbers=barbers, services=services, kits=kits)
-            service_id = kit.items[0].service_id if kit.items else service_id
-
         if not service_id:
-            flash("Selecione um serviço ou kit.", "danger")
+            flash("Selecione um serviço.", "danger")
             return render_template("appointments/form.html", form=form,
                                    barbers=barbers, services=services, kits=kits)
 
-        if not is_slot_available(form.barber_id.data, service_id, sched_date, sched_time,
-                                 kit_id=kit_id):
-            flash("Horário indisponível: o barbeiro já tem um agendamento neste intervalo.", "danger")
+        if not is_slot_available(form.barber_id.data, service_id, sched_date, sched_time):
+            flash("Horário indisponível: o profissional já tem um agendamento neste intervalo.", "danger")
             return render_template("appointments/form.html", form=form,
                                    barbers=barbers, services=services, kits=kits)
 
-        appt = Appointment(
+        appt = Agendamento(
+            empresa_id=g.empresa_id,
+            unidade_id=g.unidade_id,
             customer_id=form.customer_id.data,
             barber_id=form.barber_id.data,
             service_id=service_id,
-            kit_id=kit_id,
             scheduled_date=sched_date,
             scheduled_time=sched_time,
             notes=(form.notes.data or "").strip() or None,
         )
         db.session.add(appt)
-        db.session.flush()
 
-        from app.subscriptions.service import consume_credit, consume_credit_kit
-        if kit:
-            consume_credit_kit(form.customer_id.data, kit, appt.id)
-        else:
+        if SATELLITE_FEATURES_ENABLED:
+            db.session.flush()
+            from app.subscriptions.service import consume_credit
             consume_credit(form.customer_id.data, service_id, appt.id)
 
         db.session.commit()
@@ -167,16 +172,17 @@ def new():
                            barbers=barbers, services=services, kits=kits)
 
 
-# ── Admin / Barber: Atualizar status ─────────────────────────────────────────
+# ── Admin / Funcionário: Atualizar status ─────────────────────────────────────
 @appointments_bp.route("/<int:appt_id>/status", methods=["POST"])
 @login_required
+@requer_unidade
 def update_status(appt_id: int):
-    appt = Appointment.query.get_or_404(appt_id)
+    appt = Agendamento.query.filter_by(id=appt_id, unidade_id=g.unidade_id).first_or_404()
 
-    if current_user.is_barber and current_user.barber_profile:
-        if appt.barber_id != current_user.barber_profile.id:
-            flash("Acesso negado.", "danger")
-            return redirect(url_for("appointments.index"))
+    minha_profissional_id = _minha_profissional_id()
+    if minha_profissional_id and appt.barber_id != minha_profissional_id:
+        flash("Acesso negado.", "danger")
+        return redirect(url_for("appointments.index"))
 
     new_status = request.form.get("status", "")
     if new_status not in APPOINTMENT_STATUSES:
@@ -189,7 +195,7 @@ def update_status(appt_id: int):
     if new_status == "completed" and appt.customer:
         appt.customer.last_visit = datetime.now(timezone.utc)
 
-    if new_status == "cancelled" and old_status != "cancelled":
+    if new_status == "cancelled" and old_status != "cancelled" and SATELLITE_FEATURES_ENABLED:
         from app.subscriptions.service import refund_credit
         refund_credit(appt.id)
 
@@ -201,172 +207,17 @@ def update_status(appt_id: int):
 # ── Admin: Excluir ────────────────────────────────────────────────────────────
 @appointments_bp.route("/<int:appt_id>/delete", methods=["POST"])
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@requer_unidade
 def delete(appt_id: int):
-    appt = Appointment.query.get_or_404(appt_id)
+    appt = Agendamento.query.filter_by(id=appt_id, unidade_id=g.unidade_id).first_or_404()
     appt_date = str(appt.scheduled_date)
 
-    from app.subscriptions.service import refund_credit
-    refund_credit(appt.id)
+    if SATELLITE_FEATURES_ENABLED:
+        from app.subscriptions.service import refund_credit
+        refund_credit(appt.id)
 
     db.session.delete(appt)
     db.session.commit()
     flash("Agendamento removido.", "info")
     return redirect(url_for("appointments.index", date=appt_date))
-
-
-# ── Público: Slots disponíveis (AJAX GET) ────────────────────────────────────
-@appointments_bp.route("/slots")
-def slots():
-    barber_id  = request.args.get("barber_id",  type=int)
-    service_id = request.args.get("service_id", type=int)
-    kit_id     = request.args.get("kit_id",     type=int)
-    date_str   = request.args.get("date", "")
-
-    if not barber_id or not date_str or (not service_id and not kit_id):
-        return jsonify({"slots": []})
-
-    try:
-        target_date = date.fromisoformat(date_str)
-    except ValueError:
-        return jsonify({"slots": []})
-
-    if target_date < date.today():
-        return jsonify({"slots": []})
-
-    from app.models.barber_schedule_exception import BarberScheduleException
-    exc = BarberScheduleException.query.filter_by(
-        barber_id=barber_id, date=target_date
-    ).first()
-    if exc and exc.exception_type == "day_off":
-        return jsonify({"slots": [], "reason": "day_off"})
-
-    available = get_available_slots(barber_id, service_id, target_date, kit_id=kit_id)
-    return jsonify({"slots": [t.strftime("%H:%M") for t in available]})
-
-
-# ── Público: Agendamento online ───────────────────────────────────────────────
-@appointments_bp.route("/book", methods=["GET", "POST"])
-def book():
-    from app.models.service_kit import ServiceKit
-    services = Service.query.filter_by(is_active=True).order_by(Service.name).all()
-    barbers  = Barber.query.filter_by(is_active=True).order_by(Barber.name).all()
-    kits     = ServiceKit.query.filter_by(active=True).order_by(ServiceKit.name).all()
-    form = BookingForm()
-
-    if form.validate_on_submit():
-        kit_id_raw = form.kit_id.data
-        kit_id = int(kit_id_raw) if kit_id_raw else None
-        service_id_raw = form.service_id.data
-
-        missing = []
-        if not kit_id and not service_id_raw:
-            missing.append("serviço")
-        if not form.barber_id.data:
-            missing.append("barbeiro")
-        if not form.scheduled_date.data:
-            missing.append("data")
-        if not form.scheduled_time.data:
-            missing.append("horário")
-        if missing:
-            flash(f"Por favor, selecione: {', '.join(missing)}.", "warning")
-            return render_template("appointments/book.html",
-                                   form=form, services=services, barbers=barbers, kits=kits)
-
-        try:
-            sched_date = date.fromisoformat(form.scheduled_date.data)
-            sched_time = datetime.strptime(form.scheduled_time.data, "%H:%M").time()
-            barber_id  = int(form.barber_id.data)
-        except (ValueError, TypeError):
-            flash("Dados inválidos. Por favor, refaça a seleção.", "danger")
-            return render_template("appointments/book.html",
-                                   form=form, services=services, barbers=barbers, kits=kits)
-
-        kit = None
-        service_id = None
-        if kit_id:
-            kit = ServiceKit.query.get(kit_id)
-            if not kit or not kit.active:
-                flash("Kit inválido.", "danger")
-                return render_template("appointments/book.html",
-                                       form=form, services=services, barbers=barbers, kits=kits)
-            service_id = kit.items[0].service_id if kit.items else None
-        else:
-            service_id = int(service_id_raw)
-
-        if not service_id:
-            flash("Serviço inválido.", "danger")
-            return render_template("appointments/book.html",
-                                   form=form, services=services, barbers=barbers, kits=kits)
-
-        if not is_slot_available(barber_id, service_id, sched_date, sched_time,
-                                 kit_id=kit_id):
-            flash("Este horário não está mais disponível. Por favor, escolha outro.", "danger")
-            return render_template("appointments/book.html",
-                                   form=form, services=services, barbers=barbers, kits=kits)
-
-        try:
-            customer, _ = Customer.get_or_create(
-                name=form.customer_name.data,
-                phone=form.customer_phone.data,
-                cpf=form.customer_cpf.data,
-            )
-            db.session.flush()
-
-            appt = Appointment(
-                customer_id=customer.id,
-                barber_id=barber_id,
-                service_id=service_id,
-                kit_id=kit_id,
-                scheduled_date=sched_date,
-                scheduled_time=sched_time,
-                notes=(form.notes.data or "").strip() or None,
-            )
-            db.session.add(appt)
-            db.session.flush()
-
-            from app.subscriptions.service import consume_credit, consume_credit_kit
-            if kit:
-                consume_credit_kit(customer.id, kit, appt.id)
-            else:
-                consume_credit(customer.id, service_id, appt.id)
-
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
-            flash("Erro ao salvar o agendamento. Por favor, tente novamente.", "danger")
-            return render_template("appointments/book.html",
-                                   form=form, services=services, barbers=barbers, kits=kits)
-
-        return redirect(url_for("appointments.book_success", appt_id=appt.id))
-
-    return render_template("appointments/book.html",
-                           form=form, services=services, barbers=barbers, kits=kits)
-
-
-# ── Público: Confirmação ──────────────────────────────────────────────────────
-@appointments_bp.route("/book/success/<int:appt_id>")
-def book_success(appt_id: int):
-    appt = Appointment.query.get_or_404(appt_id)
-
-    credit_items = []
-    from app.models.subscription import SubscriptionCreditUsage, SubscriptionCreditBalance
-    usages = SubscriptionCreditUsage.query.filter_by(appointment_id=appt_id).all()
-    for usage in usages:
-        balance = SubscriptionCreditBalance.query.filter_by(
-            subscription_id=usage.subscription_id,
-            service_id=usage.service_id,
-        ).first()
-        credit_items.append({
-            "plan_name": (
-                usage.subscription.plan.name
-                if usage.subscription and usage.subscription.plan
-                else "Clube de Assinaturas"
-            ),
-            "service_name": usage.service.name if usage.service else "—",
-            "remaining": balance.remaining_credits if balance else 0,
-            "total": balance.total_credits if balance else 0,
-        })
-
-    return render_template("appointments/book_success.html",
-                           appt=appt, credit_items=credit_items)

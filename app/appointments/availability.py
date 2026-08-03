@@ -59,8 +59,8 @@ def _resolve_duration(service_id, kit_id) -> int | None:
         kit = ServiceKit.query.get(kit_id)
         return kit.total_duration_minutes if kit else None
     if service_id:
-        from app.models.service import Service
-        svc = Service.query.get(service_id)
+        from app.models.servico import Servico
+        svc = Servico.query.get(service_id)
         return svc.duration_minutes if svc else None
     return None
 
@@ -77,10 +77,10 @@ def get_available_slots(
     Passa service_id OU kit_id (não ambos). Se nenhum for válido, retorna [].
     exclude_appointment_id ignora um agendamento específico (usado em remarcações).
     """
-    from app.models.barber import Barber
-    from app.models.appointment import Appointment
+    from app.models.profissional import Profissional
+    from app.models.agendamento import Agendamento
 
-    barber = Barber.query.get(barber_id)
+    barber = Profissional.query.get(barber_id)
     if not barber:
         return []
 
@@ -102,9 +102,9 @@ def get_available_slots(
                 work_end = exc.end_time
 
     existing = (
-        Appointment.query
+        Agendamento.query
         .filter_by(barber_id=barber_id, scheduled_date=target_date)
-        .filter(Appointment.status.in_(list(BLOCKING_STATUSES)))
+        .filter(Agendamento.status.in_(list(BLOCKING_STATUSES)))
         .all()
     )
 
@@ -155,10 +155,10 @@ def is_slot_available(
     Verifica se um slot específico está disponível.
     Passa service_id OU kit_id. Considera exceções e colisões.
     """
-    from app.models.barber import Barber
-    from app.models.appointment import Appointment
+    from app.models.profissional import Profissional
+    from app.models.agendamento import Agendamento
 
-    barber = Barber.query.get(barber_id)
+    barber = Profissional.query.get(barber_id)
     if not barber:
         return False
 
@@ -193,9 +193,9 @@ def is_slot_available(
             return False
 
     existing = (
-        Appointment.query
+        Agendamento.query
         .filter_by(barber_id=barber_id, scheduled_date=target_date)
-        .filter(Appointment.status.in_(list(BLOCKING_STATUSES)))
+        .filter(Agendamento.status.in_(list(BLOCKING_STATUSES)))
         .all()
     )
 
