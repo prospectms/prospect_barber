@@ -6,11 +6,17 @@ from app.models.subscription_plan import SubscriptionPlan
 from app.models.subscription import (
     CustomerSubscription, SubscriptionCreditBalance, SubscriptionCreditUsage
 )
-from app.models.customer import Customer
-from app.utils.decorators import admin_required
+from app.models.cliente import Cliente
+from app.utils.decorators import requer_papel
+from app.utils.feature_flags import SATELLITE_FEATURES_ENABLED, bloqueado_enquanto_satelite_desativado
 from app.subscriptions.service import get_active_subscription, check_credit, check_credit_kit
 
 subscriptions_bp = Blueprint("subscriptions", __name__)
+
+# Bloqueado por completo na Fase 1-A (ver app/utils/feature_flags.py) — os
+# models de assinatura ainda não têm empresa_id/unidade_id, então nenhuma
+# consulta aqui está isolada por tenant. Fica pronto para a Fase 1-B
+# reativar (remover o decorator e escopar as queries), mas não roda hoje.
 
 _VALIDITY_OPTIONS = [
     ("30",  "30 dias"),
@@ -47,7 +53,8 @@ def _resolve_end_date(start: date) -> date:
 # ── Listagem ──────────────────────────────────────────────────────────────────
 @subscriptions_bp.route("/")
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@bloqueado_enquanto_satelite_desativado
 def index():
     status_filter = request.args.get("status", "")
     today = date.today()
@@ -97,10 +104,11 @@ def index():
 # ── Nova assinatura ────────────────────────────────────────────────────────────
 @subscriptions_bp.route("/new", methods=["GET", "POST"])
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@bloqueado_enquanto_satelite_desativado
 def new():
     plans = SubscriptionPlan.query.filter_by(active=True).order_by(SubscriptionPlan.name).all()
-    customers = Customer.query.order_by(Customer.name).all()
+    customers = Cliente.query.order_by(Cliente.name).all()
 
     if request.method == "POST":
         customer_id = request.form.get("customer_id", type=int)
@@ -113,7 +121,7 @@ def new():
         if not plan_id:
             errors.append("Selecione um plano.")
 
-        customer = Customer.query.get(customer_id) if customer_id else None
+        customer = Cliente.query.get(customer_id) if customer_id else None
         plan = SubscriptionPlan.query.get(plan_id) if plan_id else None
 
         if customer_id and not customer:
@@ -170,7 +178,8 @@ def new():
 # ── Detalhe ───────────────────────────────────────────────────────────────────
 @subscriptions_bp.route("/<int:sub_id>")
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@bloqueado_enquanto_satelite_desativado
 def detail(sub_id: int):
     sub = CustomerSubscription.query.get_or_404(sub_id)
     usages = (
@@ -190,7 +199,8 @@ def detail(sub_id: int):
 # ── Renovar ────────────────────────────────────────────────────────────────────
 @subscriptions_bp.route("/<int:sub_id>/renew", methods=["POST"])
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@bloqueado_enquanto_satelite_desativado
 def renew(sub_id: int):
     sub = CustomerSubscription.query.get_or_404(sub_id)
     new_start = date.today()
@@ -223,7 +233,8 @@ def renew(sub_id: int):
 # ── Cancelar ──────────────────────────────────────────────────────────────────
 @subscriptions_bp.route("/<int:sub_id>/cancel", methods=["POST"])
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@bloqueado_enquanto_satelite_desativado
 def cancel(sub_id: int):
     sub = CustomerSubscription.query.get_or_404(sub_id)
     sub.status = "cancelled"
@@ -236,6 +247,13 @@ def cancel(sub_id: int):
 @subscriptions_bp.route("/api/credit-check")
 @login_required
 def credit_check():
+    # Endpoint AJAX chamado de dentro do form de agendamento — não redireciona
+    # (não é navegação de página), só devolve "sem crédito" enquanto a flag
+    # estiver desligada, coerente com appointments/routes.py não chamar
+    # consume_credit/consume_credit_kit nesta fase.
+    if not SATELLITE_FEATURES_ENABLED:
+        return jsonify({"has_credit": False})
+
     customer_id = request.args.get("customer_id", type=int)
     service_id  = request.args.get("service_id",  type=int)
     kit_id      = request.args.get("kit_id",      type=int)

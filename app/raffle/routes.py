@@ -7,16 +7,23 @@ from sqlalchemy import func, distinct
 
 from app.extensions import db
 from app.models.raffle import Raffle, RaffleWinner
-from app.models.customer import Customer
-from app.models.appointment import Appointment
-from app.utils.decorators import admin_required
+from app.models.cliente import Cliente
+from app.models.agendamento import Agendamento
+from app.utils.decorators import requer_papel
+from app.utils.feature_flags import bloqueado_enquanto_satelite_desativado
 
 raffle_bp = Blueprint("raffle", __name__)
+
+# Bloqueado por completo na Fase 1-A (ver app/utils/feature_flags.py) — Raffle/
+# RaffleWinner ainda não têm empresa_id/unidade_id, então nenhuma consulta
+# aqui está isolada por tenant. A lógica abaixo fica pronta para a Fase 1-B
+# reativar (só remover o decorator e escopar as queries), mas não roda hoje.
 
 
 @raffle_bp.route("/")
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@bloqueado_enquanto_satelite_desativado
 def index():
     raffles = Raffle.query.order_by(Raffle.created_at.desc()).all()
     return render_template("raffle/index.html", raffles=raffles)
@@ -24,7 +31,8 @@ def index():
 
 @raffle_bp.route("/new", methods=["GET", "POST"])
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@bloqueado_enquanto_satelite_desativado
 def new():
     errors = {}
     form_data = {}
@@ -83,7 +91,8 @@ def new():
 
 @raffle_bp.route("/<int:raffle_id>")
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@bloqueado_enquanto_satelite_desativado
 def detail(raffle_id: int):
     raffle = Raffle.query.get_or_404(raffle_id)
     winners = raffle.winners.order_by(RaffleWinner.position).all()
@@ -94,11 +103,11 @@ def detail(raffle_id: int):
     if raffle.status == "pending":
         # Conta clientes únicos com ao menos um atendimento concluído no período
         pool_count = (
-            db.session.query(func.count(distinct(Appointment.customer_id)))
+            db.session.query(func.count(distinct(Agendamento.customer_id)))
             .filter(
-                Appointment.status == "completed",
-                Appointment.scheduled_date >= raffle.start_date,
-                Appointment.scheduled_date <= raffle.end_date,
+                Agendamento.status == "completed",
+                Agendamento.scheduled_date >= raffle.start_date,
+                Agendamento.scheduled_date <= raffle.end_date,
             )
             .scalar()
         ) or 0
@@ -106,19 +115,19 @@ def detail(raffle_id: int):
         if pool_count > 0:
             cids = [
                 r[0]
-                for r in db.session.query(Appointment.customer_id)
+                for r in db.session.query(Agendamento.customer_id)
                 .filter(
-                    Appointment.status == "completed",
-                    Appointment.scheduled_date >= raffle.start_date,
-                    Appointment.scheduled_date <= raffle.end_date,
+                    Agendamento.status == "completed",
+                    Agendamento.scheduled_date >= raffle.start_date,
+                    Agendamento.scheduled_date <= raffle.end_date,
                 )
                 .distinct()
                 .limit(10)
                 .all()
             ]
             pool_sample = (
-                Customer.query.filter(Customer.id.in_(cids))
-                .order_by(Customer.name)
+                Cliente.query.filter(Cliente.id.in_(cids))
+                .order_by(Cliente.name)
                 .all()
             )
 
@@ -133,7 +142,8 @@ def detail(raffle_id: int):
 
 @raffle_bp.route("/<int:raffle_id>/draw", methods=["POST"])
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@bloqueado_enquanto_satelite_desativado
 def draw(raffle_id: int):
     raffle = Raffle.query.get_or_404(raffle_id)
 
@@ -144,11 +154,11 @@ def draw(raffle_id: int):
     # ── 1. Montar o pool: clientes únicos com atendimento concluído no período ──
     customer_ids = [
         r[0]
-        for r in db.session.query(Appointment.customer_id)
+        for r in db.session.query(Agendamento.customer_id)
         .filter(
-            Appointment.status == "completed",
-            Appointment.scheduled_date >= raffle.start_date,
-            Appointment.scheduled_date <= raffle.end_date,
+            Agendamento.status == "completed",
+            Agendamento.scheduled_date >= raffle.start_date,
+            Agendamento.scheduled_date <= raffle.end_date,
         )
         .distinct()
         .all()
@@ -162,7 +172,7 @@ def draw(raffle_id: int):
         )
         return redirect(url_for("raffle.detail", raffle_id=raffle_id))
 
-    pool = Customer.query.filter(Customer.id.in_(customer_ids)).all()
+    pool = Cliente.query.filter(Cliente.id.in_(customer_ids)).all()
 
     # ── 2. Sortear sem repetição ──────────────────────────────────────────────
     # Se o pool for menor que os vencedores solicitados, sorteia todos do pool
@@ -197,7 +207,8 @@ def draw(raffle_id: int):
 
 @raffle_bp.route("/<int:raffle_id>/delete", methods=["POST"])
 @login_required
-@admin_required
+@requer_papel("dono", "gerente")
+@bloqueado_enquanto_satelite_desativado
 def delete(raffle_id: int):
     raffle = Raffle.query.get_or_404(raffle_id)
     name = raffle.name
