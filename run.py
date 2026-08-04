@@ -5,29 +5,32 @@ from app.extensions import db
 app = create_app(os.environ.get("FLASK_CONFIG", "development"))
 
 
-def _get_or_create_seed_empresa_unidade():
-    """Reaproveita a Empresa/Unidade "seed" que a própria migração multi-tenant
-    já cria para acomodar dado órfão (slug fixo, ver migrations/versions/
-    45c96fce867f_*.py). Os comandos de seed abaixo populam essa empresa em vez
-    de criar uma segunda — evita "por que tem duas empresas no banco?" numa
-    instalação nova onde ninguém rodou `flask db-cadastro` ainda."""
+def _get_or_create_demo_empresa_unidade():
+    """Empresa/Unidade próprias para dado de demo/dev — deliberadamente
+    SEPARADAS da Empresa/Unidade "seed" que a migração cria (slug
+    empresa-padrao-migracao, ver migrations/versions/45c96fce867f_*.py).
+
+    Aquela é reservada para acomodar dado órfão de uma migração real (seu
+    propósito documentado); não deve acumular usuário/serviço fake de
+    desenvolvimento por cima. Os comandos de seed abaixo usam esta empresa
+    de demo em vez daquela."""
     from app.models.empresa import Empresa
     from app.models.unidade import Unidade
 
-    empresa = Empresa.query.filter_by(slug="empresa-padrao-migracao").first()
+    empresa = Empresa.query.filter_by(slug="empresa-demo-dev").first()
     if not empresa:
         empresa = Empresa(
-            nome="Empresa Padrão (migração)", slug="empresa-padrao-migracao",
+            nome="Empresa Demo (dev)", slug="empresa-demo-dev",
             plano_id=1, status_assinatura="ativa",
         )
         db.session.add(empresa)
         db.session.flush()
 
-    unidade = Unidade.query.filter_by(slug="unidade-padrao-migracao").first()
+    unidade = Unidade.query.filter_by(slug="unidade-demo-dev").first()
     if not unidade:
         unidade = Unidade(
-            empresa_id=empresa.id, nome="Unidade Padrão",
-            slug="unidade-padrao-migracao", ativa=True,
+            empresa_id=empresa.id, nome="Unidade Demo",
+            slug="unidade-demo-dev", ativa=True,
         )
         db.session.add(unidade)
         db.session.flush()
@@ -61,7 +64,7 @@ def reset_db():
 
 @app.cli.command("seed")
 def seed():
-    """Popula a empresa/unidade seed com dados de demo: dono, funcionário
+    """Popula a empresa/unidade de demo com dados de exemplo: dono, funcionário
     (também profissional) e serviços. Idempotente."""
     with app.app_context():
         from app.models.usuario import Usuario
@@ -69,21 +72,21 @@ def seed():
         from app.models.profissional import Profissional
         from app.models.servico import Servico
 
-        empresa, unidade = _get_or_create_seed_empresa_unidade()
+        empresa, unidade = _get_or_create_demo_empresa_unidade()
 
-        if Usuario.query.filter_by(empresa_id=empresa.id, email="admin@prospectbarber.local").first():
+        if Usuario.query.filter_by(empresa_id=empresa.id, email="admin@prospectbarber.dev").first():
             print("Seed já aplicado.")
             return
 
         dono = Usuario(
-            empresa_id=empresa.id, nome="Admin", email="admin@prospectbarber.local",
+            empresa_id=empresa.id, nome="Admin", email="admin@prospectbarber.dev",
             papel="dono",
         )
         dono.set_password("admin123")
         db.session.add(dono)
 
         func_user = Usuario(
-            empresa_id=empresa.id, nome="João Silva", email="joao@prospectbarber.local",
+            empresa_id=empresa.id, nome="João Silva", email="joao@prospectbarber.dev",
             papel="funcionario",
         )
         func_user.set_password("barber123")
@@ -121,30 +124,30 @@ def seed():
         print("Seed aplicado com sucesso!")
         print(f"  Empresa: {empresa.nome} ({empresa.slug})")
         print(f"  Unidade: {unidade.nome} ({unidade.slug}) — agenda pública em /agendar/{unidade.slug}")
-        print("  Dono:        admin@prospectbarber.local / admin123")
-        print("  Funcionário: joao@prospectbarber.local  / barber123")
+        print("  Dono:        admin@prospectbarber.dev / admin123")
+        print("  Funcionário: joao@prospectbarber.dev  / barber123")
 
 
 @app.cli.command("seed-admin")
 def seed_admin():
-    """Cria o usuário dono de desenvolvimento na empresa/unidade seed (idempotente)."""
+    """Cria o usuário dono de desenvolvimento na empresa/unidade de demo (idempotente)."""
     with app.app_context():
         from app.models.usuario import Usuario
 
-        empresa, _ = _get_or_create_seed_empresa_unidade()
+        empresa, _ = _get_or_create_demo_empresa_unidade()
 
-        if Usuario.query.filter_by(empresa_id=empresa.id, email="admin@prospectbarber.local").first():
+        if Usuario.query.filter_by(empresa_id=empresa.id, email="admin@prospectbarber.dev").first():
             print("Usuário 'admin' já existe.")
             return
 
         dono = Usuario(
-            empresa_id=empresa.id, nome="Admin", email="admin@prospectbarber.local",
+            empresa_id=empresa.id, nome="Admin", email="admin@prospectbarber.dev",
             papel="dono",
         )
         dono.set_password("admin123")
         db.session.add(dono)
         db.session.commit()
-        print("Dono criado: admin@prospectbarber.local / admin123")
+        print("Dono criado: admin@prospectbarber.dev / admin123")
 
 
 @app.cli.command("seed-kits")
@@ -197,14 +200,14 @@ def seed_subscription_plans():
 @app.cli.command("seed-services")
 def seed_services():
     """
-    Popula serviços de exemplo na empresa/unidade seed. Não insere se essa
+    Popula serviços de exemplo na empresa/unidade de demo. Não insere se essa
     unidade já tiver serviços. Edite este seed com os serviços reais do
     cliente antes de usar em produção.
     """
     with app.app_context():
         from app.models.servico import Servico
 
-        empresa, unidade = _get_or_create_seed_empresa_unidade()
+        empresa, unidade = _get_or_create_demo_empresa_unidade()
 
         if Servico.query.filter_by(unidade_id=unidade.id).count() > 0:
             print("Unidade seed já possui serviços. Nenhum serviço inserido.")
