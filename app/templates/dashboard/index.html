@@ -190,9 +190,11 @@
   </div>
   {% if current_user.pode_gerenciar %}
   <div class="d-flex gap-2">
-    <a href="{{ url_for('appointments.book') }}" class="btn btn-sm btn-outline-gold" target="_blank">
+    {% if unidade_ativa %}
+    <a href="{{ url_for('booking.book', slug=unidade_ativa.slug) }}" class="btn btn-sm btn-outline-gold" target="_blank">
       <i class="bi bi-link-45deg me-1"></i>Link público
     </a>
+    {% endif %}
     <a href="{{ url_for('appointments.new') }}" class="btn btn-gold btn-sm fw-semibold">
       <i class="bi bi-plus-circle-fill me-1"></i>Novo agendamento
     </a>

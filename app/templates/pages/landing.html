@@ -237,9 +237,9 @@
           <i class="bi bi-whatsapp"></i>
           <span class="d-none d-sm-inline">Falar no WhatsApp</span>
         </a>
-        <a href="{{ url_for('appointments.book') }}"
+        <a href="{{ url_for('auth.cadastro') }}"
            class="btn btn-sm btn-outline-secondary">
-          <i class="bi bi-calendar-plus me-1"></i>Agendar
+          <i class="bi bi-rocket-takeoff me-1"></i>Criar minha empresa
         </a>
       </div>
     </div>
@@ -450,7 +450,7 @@
     <i class="bi bi-scissors me-1" style="color:var(--gold)"></i>
     © {{ now.year if now is defined else 2026 }} Prospect Barber · Desenvolvido por
     <a href="https://theprospect.com.br" target="_blank" rel="noopener">Prospect+</a>
-    · <a href="{{ url_for('appointments.book') }}">Agendar horário</a>
+    · <a href="{{ url_for('auth.cadastro') }}">Criar minha empresa</a>
   </div>
 </footer>
 
