@@ -9,6 +9,7 @@ from app.appointments.forms import BookingForm
 from app.appointments.availability import get_available_slots, is_slot_available
 from app.utils.tenant_context import resolver_unidade_por_slug
 from app.utils.feature_flags import SATELLITE_FEATURES_ENABLED
+from app.utils.uso import registrar_agendamento_criado
 
 booking_bp = Blueprint("booking", __name__)
 
@@ -95,6 +96,7 @@ def book(slug: str):
                 notes=(form.notes.data or "").strip() or None,
             )
             db.session.add(appt)
+            registrar_agendamento_criado(unidade.empresa_id)  # agendamento_original_id=None -> conta
             db.session.commit()
         except Exception:
             db.session.rollback()

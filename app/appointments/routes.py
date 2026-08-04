@@ -13,6 +13,7 @@ from app.appointments.forms import AppointmentAdminForm
 from app.appointments.availability import get_available_slots, is_slot_available
 from app.utils.decorators import requer_papel, requer_unidade
 from app.utils.feature_flags import SATELLITE_FEATURES_ENABLED
+from app.utils.uso import registrar_agendamento_criado
 
 appointments_bp = Blueprint("appointments", __name__)
 
@@ -158,6 +159,7 @@ def new():
             notes=(form.notes.data or "").strip() or None,
         )
         db.session.add(appt)
+        registrar_agendamento_criado(g.empresa_id)  # agendamento_original_id=None -> conta
 
         if SATELLITE_FEATURES_ENABLED:
             db.session.flush()

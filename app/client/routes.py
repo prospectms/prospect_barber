@@ -286,6 +286,9 @@ def reschedule_appointment(slug: str, appt_id: int):
             service_id=appt.service_id,
             scheduled_date=sched_date,
             scheduled_time=sched_time,
+            # Marca remarcação — UsoMensal só incrementa quando este campo é
+            # NULL (ver app/utils/uso.py). Trocar de horário não é uso novo.
+            agendamento_original_id=appt.id,
         )
         db.session.add(new_appt)
         db.session.flush()

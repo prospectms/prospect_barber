@@ -8,6 +8,7 @@ from app.models.cliente import Cliente
 from app.models.profissional import Profissional
 from app.models.servico import Servico
 from app.utils.decorators import requer_unidade
+from app.utils.uso import aviso_uso_mensal
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -45,6 +46,10 @@ def index():
     top_barbers = _top_barbers(month_start, unidade_id) if current_user.pode_gerenciar else []
     top_services = _top_services(month_start, unidade_id, barber_id)
 
+    # Aviso de uso mensal (a partir de 450 agendamentos reais no mês, nunca
+    # bloqueia) — só faz sentido pra quem decide sobre plano/upgrade.
+    aviso_uso = aviso_uso_mensal(g.empresa_id) if current_user.pode_gerenciar else None
+
     today_label = (
         f"{_WEEKDAYS_PT[today.weekday()].capitalize()}, "
         f"{today.day} de {_MONTHS_PT[today.month - 1]} de {today.year}"
@@ -58,6 +63,7 @@ def index():
         upcoming=upcoming,
         top_barbers=top_barbers,
         top_services=top_services,
+        aviso_uso=aviso_uso,
         today=today,
         today_label=today_label,
         month_label=month_label,
