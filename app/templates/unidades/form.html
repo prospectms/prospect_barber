@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Nova Unidade{% endblock %}
+{% block page_title %}Nova Unidade{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-7 col-lg-8 col-md-10">
+
+    <!-- Breadcrumb -->
+    <nav class="mb-3" aria-label="breadcrumb">
+      <ol class="breadcrumb breadcrumb-dark small">
+        <li class="breadcrumb-item">
+          <a href="{{ url_for('auth.selecionar_unidade') }}" class="text-gold">Unidades</a>
+        </li>
+        <li class="breadcrumb-item active">Nova</li>
+      </ol>
+    </nav>
+
+    <form method="POST" novalidate>
+      {{ form.hidden_tag() }}
+
+      <div class="card card-dark mb-4">
+        <div class="card-header">
+          <h6 class="fw-bold mb-0">
+            <i class="bi bi-shop text-gold me-2"></i>Cadastrar unidade
+          </h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+
+            <div class="col-12">
+              <label class="form-label fw-semibold small">
+                {{ form.nome.label.text }} <span class="text-danger">*</span>
+              </label>
+              {{ form.nome(
+                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.nome.errors else ""),
+                  placeholder="Ex: Unidade Centro"
+              ) }}
+              {% for e in form.nome.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold small">
+                {{ form.slug.label.text }} <span class="text-danger">*</span>
+              </label>
+              <div class="input-group">
+                <span class="input-group-text bg-dark border-secondary text-muted small">/agendar/</span>
+                {{ form.slug(
+                    class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.slug.errors else ""),
+                    placeholder="barbearia-do-joao-zona-sul"
+                ) }}
+              </div>
+              <div class="form-text">O endereço que os clientes dessa unidade vão usar pra agendar online.</div>
+              {% for e in form.slug.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ form.endereco.label.text }}</label>
+              {{ form.endereco(class="form-control bg-dark border-secondary text-light", placeholder="Rua, número, bairro") }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ form.telefone.label.text }}</label>
+              {{ form.telefone(class="form-control bg-dark border-secondary text-light", placeholder="(00) 00000-0000") }}
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        {{ form.submit(class="btn btn-gold px-4 fw-bold") }}
+        <a href="{{ url_for('auth.selecionar_unidade') }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+
+  </div>
+</div>
+{% endblock %}
