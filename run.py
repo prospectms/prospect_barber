@@ -5,56 +5,113 @@ from app.extensions import db
 app = create_app(os.environ.get("FLASK_CONFIG", "development"))
 
 
+def _get_or_create_seed_empresa_unidade():
+    """Reaproveita a Empresa/Unidade "seed" que a própria migração multi-tenant
+    já cria para acomodar dado órfão (slug fixo, ver migrations/versions/
+    45c96fce867f_*.py). Os comandos de seed abaixo populam essa empresa em vez
+    de criar uma segunda — evita "por que tem duas empresas no banco?" numa
+    instalação nova onde ninguém rodou `flask db-cadastro` ainda."""
+    from app.models.empresa import Empresa
+    from app.models.unidade import Unidade
+
+    empresa = Empresa.query.filter_by(slug="empresa-padrao-migracao").first()
+    if not empresa:
+        empresa = Empresa(
+            nome="Empresa Padrão (migração)", slug="empresa-padrao-migracao",
+            plano_id=1, status_assinatura="ativa",
+        )
+        db.session.add(empresa)
+        db.session.flush()
+
+    unidade = Unidade.query.filter_by(slug="unidade-padrao-migracao").first()
+    if not unidade:
+        unidade = Unidade(
+            empresa_id=empresa.id, nome="Unidade Padrão",
+            slug="unidade-padrao-migracao", ativa=True,
+        )
+        db.session.add(unidade)
+        db.session.flush()
+
+    return empresa, unidade
+
+
 @app.cli.command("init-db")
 def init_db():
-    """Cria todas as tabelas no banco de dados."""
-    with app.app_context():
-        db.create_all()
-        print("Banco de dados inicializado.")
+    """[Descontinuado] Schema agora é gerenciado por Alembic. Use `flask db upgrade`."""
+    print("Este comando foi substituído por Alembic (Fase 1-A).")
+    print("Use: flask db upgrade")
 
 
 @app.cli.command("reset-db")
 def reset_db():
-    """APAGA e recria todas as tabelas (use apenas em desenvolvimento)."""
+    """APAGA e recria todo o schema via Alembic (use apenas em desenvolvimento).
+
+    Fica dentro do próprio Alembic (downgrade até base + upgrade até head) em
+    vez de db.drop_all()/db.create_all() cru — isso mantém alembic_version
+    consistente. Um drop_all()/create_all() direto derruba as tabelas mas
+    deixa alembic_version apontando pra uma revisão que não bate mais com o
+    schema real, quebrando o próximo `flask db upgrade`.
+    """
+    from flask_migrate import downgrade, upgrade
     with app.app_context():
-        db.drop_all()
-        db.create_all()
-        print("Banco de dados resetado.")
+        downgrade(revision="base")
+        upgrade()
+        print("Banco de dados resetado via Alembic (base -> head).")
 
 
 @app.cli.command("seed")
 def seed():
-    """Popula o banco com dados iniciais (admin + exemplos)."""
+    """Popula a empresa/unidade seed com dados de demo: dono, funcionário
+    (também profissional) e serviços. Idempotente."""
     with app.app_context():
-        from app.models.user import User
-        from app.models.barber import Barber
-        from app.models.service import Service
+        from app.models.usuario import Usuario
+        from app.models.usuario_unidade import UsuarioUnidade
+        from app.models.profissional import Profissional
+        from app.models.servico import Servico
 
-        if User.query.filter_by(username="admin").first():
+        empresa, unidade = _get_or_create_seed_empresa_unidade()
+
+        if Usuario.query.filter_by(empresa_id=empresa.id, email="admin@prospectbarber.local").first():
             print("Seed já aplicado.")
             return
 
-        admin = User(username="admin", email="admin@prospectbarber.local", role="admin")
-        admin.set_password("admin123")
-        db.session.add(admin)
+        dono = Usuario(
+            empresa_id=empresa.id, nome="Admin", email="admin@prospectbarber.local",
+            papel="dono",
+        )
+        dono.set_password("admin123")
+        db.session.add(dono)
 
-        barber_user = User(username="joao", email="joao@prospectbarber.local", role="barber")
-        barber_user.set_password("barber123")
-        db.session.add(barber_user)
-        db.session.flush()
+        func_user = Usuario(
+            empresa_id=empresa.id, nome="João Silva", email="joao@prospectbarber.local",
+            papel="funcionario",
+        )
+        func_user.set_password("barber123")
+        db.session.add(func_user)
+        db.session.flush()  # obtém func_user.id
 
-        barber = Barber(user_id=barber_user.id, name="João Silva",
-                        phone="(11) 99999-0001", specialty="Degradê e Navalhado")
-        db.session.add(barber)
+        db.session.add(UsuarioUnidade(
+            empresa_id=empresa.id, usuario_id=func_user.id, unidade_id=unidade.id,
+        ))
+
+        profissional = Profissional(
+            empresa_id=empresa.id, unidade_id=unidade.id, usuario_id=func_user.id,
+            name="João Silva", phone="(11) 99999-0001", specialty="Degradê e Navalhado",
+        )
+        db.session.add(profissional)
 
         services = [
-            Service(name="Corte Tradicional", price=35.00, duration_minutes=30,
+            Servico(empresa_id=empresa.id, unidade_id=unidade.id,
+                    name="Corte Tradicional", price=35.00, duration_minutes=30,
                     description="Corte clássico com tesoura e máquina."),
-            Service(name="Degradê", price=45.00, duration_minutes=45,
+            Servico(empresa_id=empresa.id, unidade_id=unidade.id,
+                    name="Degradê", price=45.00, duration_minutes=45,
                     description="Corte moderno com degradê nas laterais."),
-            Service(name="Barba Completa", price=30.00, duration_minutes=30,
+            Servico(empresa_id=empresa.id, unidade_id=unidade.id,
+                    name="Barba Completa", price=30.00, duration_minutes=30,
                     description="Barba feita com navalha e acabamento perfeito."),
-            Service(name="Corte + Barba", price=65.00, duration_minutes=60,
+            Servico(empresa_id=empresa.id, unidade_id=unidade.id,
+                    name="Corte + Barba", price=65.00, duration_minutes=60,
                     description="Combo completo com desconto."),
         ]
         for s in services:
@@ -62,35 +119,51 @@ def seed():
 
         db.session.commit()
         print("Seed aplicado com sucesso!")
-        print("  Admin:  admin / admin123")
-        print("  Barber: joao  / barber123")
+        print(f"  Empresa: {empresa.nome} ({empresa.slug})")
+        print(f"  Unidade: {unidade.nome} ({unidade.slug}) — agenda pública em /agendar/{unidade.slug}")
+        print("  Dono:        admin@prospectbarber.local / admin123")
+        print("  Funcionário: joao@prospectbarber.local  / barber123")
 
 
 @app.cli.command("seed-admin")
 def seed_admin():
-    """Cria o usuário admin de desenvolvimento (idempotente)."""
+    """Cria o usuário dono de desenvolvimento na empresa/unidade seed (idempotente)."""
     with app.app_context():
-        from app.models.user import User
+        from app.models.usuario import Usuario
 
-        if User.query.filter_by(username="admin").first():
+        empresa, _ = _get_or_create_seed_empresa_unidade()
+
+        if Usuario.query.filter_by(empresa_id=empresa.id, email="admin@prospectbarber.local").first():
             print("Usuário 'admin' já existe.")
-        else:
-            admin = User(username="admin", email="admin@prospectbarber.local", role="admin")
-            admin.set_password("admin123")
-            db.session.add(admin)
-            db.session.commit()
-            print("Admin criado: admin / admin123")
+            return
+
+        dono = Usuario(
+            empresa_id=empresa.id, nome="Admin", email="admin@prospectbarber.local",
+            papel="dono",
+        )
+        dono.set_password("admin123")
+        db.session.add(dono)
+        db.session.commit()
+        print("Dono criado: admin@prospectbarber.local / admin123")
 
 
 @app.cli.command("seed-kits")
 def seed_kits():
+    """[Fase 1-B] ServiceKit ainda não tem empresa_id/unidade_id.
+
+    Bloqueado enquanto app.utils.feature_flags.SATELLITE_FEATURES_ENABLED for
+    False — rodar este seed hoje criaria linhas sem escopo de tenant,
+    visíveis pra qualquer empresa (o mesmo problema que o decorator
+    bloqueado_enquanto_satelite_desativado evita nas rotas).
     """
-    Cria kits de serviço de exemplo. Não insere se já houver kits.
-    Edite este seed com os kits do seu cliente antes de usar em produção.
-    """
+    from app.utils.feature_flags import SATELLITE_FEATURES_ENABLED
+    if not SATELLITE_FEATURES_ENABLED:
+        print("ServiceKit é um model satélite sem escopo de tenant ainda (Fase 1-B). Seed desativado.")
+        return
+
     with app.app_context():
         from app.models.service_kit import ServiceKit, ServiceKitItem
-        from app.models.service import Service
+        from app.models.servico import Servico
 
         if ServiceKit.query.count() > 0:
             print("Kits já existem. Nenhum kit inserido.")
@@ -101,10 +174,16 @@ def seed_kits():
 
 @app.cli.command("seed-subscription-plans")
 def seed_subscription_plans():
+    """[Fase 1-B] SubscriptionPlan ainda não tem empresa_id.
+
+    Bloqueado enquanto SATELLITE_FEATURES_ENABLED for False — mesma razão de
+    seed-kits.
     """
-    Cria planos de assinatura de exemplo. Não insere se já houver planos.
-    Edite este seed com os planos do seu cliente antes de usar em produção.
-    """
+    from app.utils.feature_flags import SATELLITE_FEATURES_ENABLED
+    if not SATELLITE_FEATURES_ENABLED:
+        print("SubscriptionPlan é um model satélite sem escopo de tenant ainda (Fase 1-B). Seed desativado.")
+        return
+
     with app.app_context():
         from app.models.subscription_plan import SubscriptionPlan
 
@@ -118,14 +197,17 @@ def seed_subscription_plans():
 @app.cli.command("seed-services")
 def seed_services():
     """
-    Popula serviços de exemplo. Não insere se já houver serviços.
-    Edite este seed com os serviços reais do cliente antes de usar em produção.
+    Popula serviços de exemplo na empresa/unidade seed. Não insere se essa
+    unidade já tiver serviços. Edite este seed com os serviços reais do
+    cliente antes de usar em produção.
     """
     with app.app_context():
-        from app.models.service import Service
+        from app.models.servico import Servico
 
-        if Service.query.count() > 0:
-            print("Tabela de serviços já possui dados. Nenhum serviço inserido.")
+        empresa, unidade = _get_or_create_seed_empresa_unidade()
+
+        if Servico.query.filter_by(unidade_id=unidade.id).count() > 0:
+            print("Unidade seed já possui serviços. Nenhum serviço inserido.")
             return
 
         print("Nenhum serviço de exemplo definido. Edite 'seed-services' em run.py para adicionar os serviços do cliente.")
@@ -133,21 +215,51 @@ def seed_services():
 
 @app.cli.command("seed-prospect")
 def seed_prospect():
-    """Cria o usuário admin principal do cliente Prospect (idempotente)."""
+    """Cria a empresa interna da equipe Prospect + o usuário superadmin (idempotente).
+
+    Diferente de `seed`/`seed-admin` (que populam a empresa/unidade de
+    demo), este comando cria uma empresa própria só pra equipe Prospect —
+    o superadmin não deveria morar dentro da empresa placeholder de
+    migração. is_superadmin=True dá acesso a /superadmin (todas as
+    empresas + auditoria) independente do papel dentro da própria empresa.
+    """
     with app.app_context():
-        from app.models.user import User
+        from app.models.empresa import Empresa
+        from app.models.unidade import Unidade
+        from app.models.usuario import Usuario
 
         email = "administrativo@theprospect.com.br"
-        if User.query.filter_by(email=email).first():
-            print(f"Usuário com e-mail '{email}' já existe.")
+        existing = Usuario.query.filter_by(email=email).first()
+        if existing:
+            print(f"Usuário com e-mail '{email}' já existe (empresa_id={existing.empresa_id}).")
             return
 
-        user = User(username="prospect", email=email, role="admin")
+        empresa = Empresa.query.filter_by(slug="prospect-interno").first()
+        if not empresa:
+            empresa = Empresa(
+                nome="Prospect Barber (equipe interna)", slug="prospect-interno",
+                email=email, plano_id=1, status_assinatura="ativa",
+            )
+            db.session.add(empresa)
+            db.session.flush()
+
+        unidade = Unidade.query.filter_by(slug="prospect-interno-sede").first()
+        if not unidade:
+            unidade = Unidade(
+                empresa_id=empresa.id, nome="Sede", slug="prospect-interno-sede", ativa=True,
+            )
+            db.session.add(unidade)
+            db.session.flush()
+
+        user = Usuario(
+            empresa_id=empresa.id, nome="Administrativo Prospect", email=email,
+            papel="dono", is_superadmin=True,
+        )
         user.set_password("Prospect@2025!")
         db.session.add(user)
         db.session.commit()
-        print(f"Admin criado: prospect / Prospect@2025! ({email})")
-        print("Altere a senha após o primeiro login!")
+        print(f"Superadmin criado: {email} / Prospect@2025!")
+        print("Altere a senha após o primeiro login! Acesso a todas as empresas em /superadmin")
 
 
 if __name__ == "__main__":
