@@ -137,17 +137,17 @@
       <i class="bi bi-exclamation-triangle-fill mt-1 flex-shrink-0"></i>
       <div>
         Chegue com alguns minutos de antecedência. Caso precise cancelar,
-        <a href="{{ url_for('client.lookup') }}" class="alert-link">acesse seu portal</a>
+        <a href="{{ url_for('client.lookup', slug=unidade.slug) }}" class="alert-link">acesse seu portal</a>
         ou entre em contato com a barbearia.
       </div>
     </div>
 
     <!-- Ações -->
     <div class="d-flex gap-2 justify-content-center flex-wrap">
-      <a href="{{ url_for('client.lookup') }}" class="btn btn-outline-secondary px-4">
+      <a href="{{ url_for('client.lookup', slug=unidade.slug) }}" class="btn btn-outline-secondary px-4">
         <i class="bi bi-person-vcard me-2"></i>Meus agendamentos
       </a>
-      <a href="{{ url_for('appointments.book') }}" class="btn btn-gold px-4 fw-bold">
+      <a href="{{ url_for('booking.book', slug=unidade.slug) }}" class="btn btn-gold px-4 fw-bold">
         <i class="bi bi-plus-circle me-2"></i>Novo agendamento
       </a>
     </div>

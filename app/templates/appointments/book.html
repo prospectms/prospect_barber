@@ -11,7 +11,7 @@
     <!-- ══════════════════════════════════════════════════════ -->
     <div id="sec-landing">
       <div class="text-center mb-5 pt-2">
-        <h3 class="fw-bold mb-1">Bem-vindo à Prospect Barber</h3>
+        <h3 class="fw-bold mb-1">Bem-vindo{{ " à " + unidade.nome if unidade else "" }}</h3>
         <p class="text-muted small">O que deseja fazer?</p>
       </div>
       <div class="landing-wrap">
@@ -35,7 +35,7 @@
           </div>
           <div class="sep-line"></div>
         </div>
-        <a href="{{ url_for('client.lookup') }}" class="landing-card text-decoration-none" tabindex="0">
+        <a href="{{ url_for('client.lookup', slug=unidade.slug) }}" class="landing-card text-decoration-none" tabindex="0">
           <div class="landing-card-icon"><i class="bi bi-person-lines-fill"></i></div>
           <div class="landing-card-title">Verificar Agendamento</div>
           <div class="landing-card-desc">Consulte, confirme ou cancele seus horários pelo CPF, sem login.</div>
@@ -59,7 +59,7 @@
         <p class="text-muted small">Siga os passos abaixo para garantir seu horário.</p>
       </div>
 
-    <form method="POST" action="{{ url_for('appointments.book') }}" novalidate id="bookForm">
+    <form method="POST" action="{{ url_for('booking.book', slug=unidade.slug) }}" novalidate id="bookForm">
       {{ form.hidden_tag() }}
       <!-- Os HiddenFields service_id, barber_id, scheduled_date, scheduled_time
            já são renderizados acima pelo hidden_tag() com ids padrão do WTForms.
@@ -668,9 +668,8 @@ function loadSlots() {
   spin.style.display = 'block';
   empty.style.display = 'none';
 
-  let slotsUrl = `/appointments/slots?barber_id=${state.barberId}&date=${state.date}`;
-  if (state.kitId)     slotsUrl += `&kit_id=${state.kitId}`;
-  else if (state.serviceId) slotsUrl += `&service_id=${state.serviceId}`;
+  let slotsUrl = `{{ url_for('booking.slots', slug=unidade.slug) }}?barber_id=${state.barberId}&date=${state.date}`;
+  if (state.serviceId) slotsUrl += `&service_id=${state.serviceId}`;
 
   fetch(slotsUrl)
     .then(r => r.json())

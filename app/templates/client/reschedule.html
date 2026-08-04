@@ -15,7 +15,7 @@
     </div>
 
     <form method="POST"
-          action="{{ url_for('client.reschedule_appointment', appt_id=appt.id) }}"
+          action="{{ url_for('client.reschedule_appointment', slug=unidade.slug, appt_id=appt.id) }}"
           novalidate id="rescheduleForm">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="cpf" value="{{ cpf }}">
@@ -111,7 +111,7 @@
                 class="btn btn-gold px-4 fw-bold" disabled>
           <i class="bi bi-calendar-check-fill me-2"></i>Confirmar remarcação
         </button>
-        <a href="{{ url_for('client.lookup') }}" class="btn btn-outline-secondary">
+        <a href="{{ url_for('client.lookup', slug=unidade.slug) }}" class="btn btn-outline-secondary">
           Cancelar
         </a>
       </div>
@@ -260,12 +260,10 @@ if (datePicker) {
 function loadSlots() {
   if (!state.barberId || !state.date) return;
   const serviceId = {{ appt.service_id or 'null' }};
-  const kitId     = {{ appt.kit_id or 'null' }};
   const excludeId = {{ appt.id }};
 
-  let url = `/client/slots?barber_id=${state.barberId}&date=${state.date}&exclude_id=${excludeId}`;
-  if (kitId)     url += '&kit_id=' + kitId;
-  else if (serviceId) url += '&service_id=' + serviceId;
+  let url = `{{ url_for('client.slots', slug=unidade.slug) }}?barber_id=${state.barberId}&date=${state.date}&exclude_id=${excludeId}`;
+  if (serviceId) url += '&service_id=' + serviceId;
 
   const grid  = document.getElementById('slots_grid');
   const spin  = document.getElementById('slots_loading');

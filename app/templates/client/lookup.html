@@ -7,13 +7,13 @@
 
     <div class="text-center mb-4">
       <h3 class="fw-bold mb-1">Portal do Cliente</h3>
-      <p class="text-muted small">Consulte e gerencie seus agendamentos informando seu CPF.</p>
+      <p class="text-muted small">{{ unidade.nome }} · Consulte e gerencie seus agendamentos informando seu CPF.</p>
     </div>
 
     <!-- ── Formulário CPF ──────────────────────────────────────────── -->
     <div class="card card-dark mb-4">
       <div class="card-body p-4">
-        <form method="POST" action="{{ url_for('client.lookup') }}" novalidate id="lookupForm">
+        <form method="POST" action="{{ url_for('client.lookup', slug=unidade.slug) }}" novalidate id="lookupForm">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="row g-3 align-items-end">
             <div class="col-md-5">
@@ -108,7 +108,7 @@
           <div class="flex-grow-1">
             <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
               <span class="fw-semibold small">
-                {{ a.kit.name if a.kit else (a.service.name if a.service else '—') }}
+                {{ a.service.name if a.service else '—' }}
               </span>
               <span class="badge bg-{{ a.status_color }} badge-sm">{{ a.status_label }}</span>
             </div>
@@ -135,7 +135,7 @@
           {% if can_act %}
           <div class="appt-actions d-flex gap-1 flex-shrink-0">
             {% if a.status == 'pending' %}
-            <form method="POST" action="{{ url_for('client.confirm_appointment', appt_id=a.id) }}">
+            <form method="POST" action="{{ url_for('client.confirm_appointment', slug=unidade.slug, appt_id=a.id) }}">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="cpf" value="{{ customer.cpf }}">
               <button type="submit" class="btn btn-sm btn-outline-success"
@@ -144,11 +144,11 @@
               </button>
             </form>
             {% endif %}
-            <a href="{{ url_for('client.reschedule_appointment', appt_id=a.id) }}"
+            <a href="{{ url_for('client.reschedule_appointment', slug=unidade.slug, appt_id=a.id) }}"
                class="btn btn-sm btn-outline-gold" title="Remarcar">
               <i class="bi bi-calendar-plus"></i>
             </a>
-            <form method="POST" action="{{ url_for('client.cancel_appointment', appt_id=a.id) }}"
+            <form method="POST" action="{{ url_for('client.cancel_appointment', slug=unidade.slug, appt_id=a.id) }}"
                   onsubmit="return confirm('Cancelar este agendamento?')">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="cpf" value="{{ customer.cpf }}">
@@ -168,7 +168,7 @@
     <div class="text-center py-5 text-muted">
       <i class="bi bi-calendar-x d-block fs-2 mb-2 opacity-50"></i>
       <div class="small">Nenhum agendamento encontrado{% if date_from or date_to %} no período selecionado{% endif %}.</div>
-      <a href="{{ url_for('appointments.book') }}" class="btn btn-gold btn-sm mt-3">
+      <a href="{{ url_for('booking.book', slug=unidade.slug) }}" class="btn btn-gold btn-sm mt-3">
         <i class="bi bi-plus-circle me-1"></i>Fazer um agendamento
       </a>
     </div>
@@ -177,7 +177,7 @@
     {% elif cpf_input %}
     {# Flash já exibido pelo base_public; apenas botão de novo agendamento #}
     <div class="text-center py-3">
-      <a href="{{ url_for('appointments.book') }}" class="btn btn-gold btn-sm">
+      <a href="{{ url_for('booking.book', slug=unidade.slug) }}" class="btn btn-gold btn-sm">
         <i class="bi bi-plus-circle me-1"></i>Fazer um agendamento
       </a>
     </div>
