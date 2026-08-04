@@ -105,6 +105,10 @@
        class="sidebar-link {% if request.blueprint == 'auth' and 'user' in request.endpoint %}active{% endif %}">
       <i class="bi bi-shield-lock-fill"></i><span>Usuários</span>
     </a>
+    <a href="{{ url_for('upgrade.index') }}"
+       class="sidebar-link {% if request.blueprint == 'upgrade' %}active{% endif %}">
+      <i class="bi bi-rocket-takeoff-fill"></i><span>Planos</span>
+    </a>
     {% endif %}
 
     {% if current_user.is_superadmin %}

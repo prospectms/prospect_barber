@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Planos{% endblock %}
+{% block page_title %}Planos{% endblock %}
+
+{% block content %}
+<div class="mb-4 mt-2">
+  <h5 class="fw-bold mb-0">Escolha o plano da sua empresa</h5>
+  <p class="text-muted small mb-0">
+    Plano atual: <strong>{{ empresa.plano.nome|capitalize }}</strong>
+    {% if empresa.periodicidade %} · {{ empresa.periodicidade|capitalize }}{% endif %}
+  </p>
+</div>
+
+<div class="row g-4">
+  {% for plano in planos %}
+  {% set atual = empresa.plano_id == plano.id %}
+  <div class="col-md-6 col-xl-3">
+    <div class="card card-dark h-100 {% if atual %}border-gold{% endif %}">
+      <div class="card-header text-center">
+        <h6 class="fw-bold mb-0 text-uppercase">{{ plano.nome }}</h6>
+      </div>
+      <div class="card-body d-flex flex-column">
+
+        <div class="text-center mb-3">
+          <div class="fs-4 fw-bold text-gold">{{ plano.preco_mensal_formatado }}<span class="fs-6 text-muted">/mês</span></div>
+          <div class="text-muted small">ou {{ plano.preco_anual_formatado }}/ano</div>
+        </div>
+
+        <ul class="list-unstyled small flex-grow-1">
+          <li class="mb-2">
+            <i class="bi bi-shop text-gold me-2"></i>
+            {{ plano.max_unidades if plano.max_unidades is not none else "Unidades ilimitadas" }}
+            {% if plano.max_unidades is not none %} unidade(s){% endif %}
+          </li>
+          <li class="mb-2">
+            <i class="bi bi-people-fill text-gold me-2"></i>
+            {{ plano.max_usuarios if plano.max_usuarios is not none else "Usuários ilimitados" }}
+            {% if plano.max_usuarios is not none %} usuário(s){% endif %}
+          </li>
+          <li class="mb-2">
+            <i class="bi bi-stars text-gold me-2"></i>
+            {{ plano.max_servicos if plano.max_servicos is not none else "Serviços ilimitados" }}
+            {% if plano.max_servicos is not none %} serviço(s){% endif %}
+          </li>
+          {% if plano.tem_modulo('relatorios') %}
+          <li class="mb-2"><i class="bi bi-bar-chart-fill text-gold me-2"></i>Relatórios avançados</li>
+          {% endif %}
+          {% if plano.tem_modulo('clube_recorrencia') %}
+          <li class="mb-2"><i class="bi bi-award-fill text-gold me-2"></i>Clube de assinaturas</li>
+          {% endif %}
+        </ul>
+
+        {% if atual %}
+        <button class="btn btn-outline-gold w-100" disabled>Plano atual</button>
+        {% else %}
+        <form method="POST" action="{{ url_for('upgrade.checkout', plano_id=plano.id) }}">
+          <button type="submit" class="btn btn-gold w-100 fw-bold">Assinar</button>
+        </form>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.border-gold { border-color: var(--gold) !important; border-width: 2px; }
+</style>
+{% endblock %}

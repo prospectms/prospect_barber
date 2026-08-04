@@ -68,6 +68,7 @@ def _register_blueprints(app: Flask) -> None:
     from app.pages.routes import pages_bp
     from app.superadmin.routes import superadmin_bp
     from app.unidades.routes import unidades_bp
+    from app.upgrade.routes import upgrade_bp
 
     app.register_blueprint(auth_bp,           url_prefix="/auth")
     app.register_blueprint(dashboard_bp,      url_prefix="/")
@@ -83,6 +84,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(pages_bp,          url_prefix="/")
     app.register_blueprint(superadmin_bp,     url_prefix="/superadmin")
     app.register_blueprint(unidades_bp,       url_prefix="/unidades")
+    app.register_blueprint(upgrade_bp,        url_prefix="/upgrade")
 
 
 def _configure_login_manager() -> None:
