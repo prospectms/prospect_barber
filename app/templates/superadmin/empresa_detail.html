@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ empresa.nome }} — Superadmin{% endblock %}
+{% block page_title %}{{ empresa.nome }}{% endblock %}
+
+{% block content %}
+<nav class="mb-3" aria-label="breadcrumb">
+  <ol class="breadcrumb breadcrumb-dark small">
+    <li class="breadcrumb-item"><a href="{{ url_for('superadmin.empresas') }}" class="text-gold">Empresas</a></li>
+    <li class="breadcrumb-item active">{{ empresa.nome }}</li>
+  </ol>
+</nav>
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  {% for label, value, icon in [
+      ("Unidades", stats.unidades, "shop"),
+      ("Usuários", stats.usuarios, "people-fill"),
+      ("Clientes", stats.clientes, "person-vcard-fill"),
+      ("Profissionais", stats.profissionais, "person-badge-fill"),
+      ("Serviços", stats.servicos, "stars"),
+      ("Agendamentos", stats.agendamentos, "calendar-check-fill"),
+  ] %}
+  <div class="col-6 col-md-4 col-xl-2">
+    <div class="card card-dark text-center">
+      <div class="card-body py-3">
+        <i class="bi bi-{{ icon }} text-gold fs-4"></i>
+        <div class="fw-bold fs-5 mt-1">{{ value }}</div>
+        <div class="text-muted small">{{ label }}</div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-4">
+
+  <!-- Dados da empresa -->
+  <div class="col-lg-4">
+    <div class="card card-dark">
+      <div class="card-header"><h6 class="fw-bold mb-0"><i class="bi bi-building text-gold me-2"></i>Dados</h6></div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-5 text-muted">Slug</dt><dd class="col-7"><code>{{ empresa.slug }}</code></dd>
+          <dt class="col-5 text-muted">Documento</dt><dd class="col-7">{{ empresa.documento or "—" }}</dd>
+          <dt class="col-5 text-muted">E-mail</dt><dd class="col-7">{{ empresa.email or "—" }}</dd>
+          <dt class="col-5 text-muted">Telefone</dt><dd class="col-7">{{ empresa.telefone or "—" }}</dd>
+          <dt class="col-5 text-muted">Status</dt>
+          <dd class="col-7">
+            <span class="badge bg-{% if empresa.status_assinatura == 'ativa' %}success{% else %}secondary{% endif %}">
+              {{ empresa.status_assinatura }}
+            </span>
+          </dd>
+          <dt class="col-5 text-muted">Criada em</dt>
+          <dd class="col-7">{{ empresa.criada_em.strftime('%d/%m/%Y %H:%M') if empresa.criada_em else "—" }}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unidades -->
+  <div class="col-lg-8">
+    <div class="card card-dark mb-4">
+      <div class="card-header"><h6 class="fw-bold mb-0"><i class="bi bi-shop text-gold me-2"></i>Unidades</h6></div>
+      <div class="table-responsive">
+        <table class="table table-dark table-hover mb-0 align-middle">
+          <thead><tr><th>Nome</th><th>Slug</th><th class="text-center">Status</th></tr></thead>
+          <tbody>
+            {% for u in unidades %}
+            <tr>
+              <td>{{ u.nome }}</td>
+              <td class="text-muted small"><code>{{ u.slug }}</code></td>
+              <td class="text-center">
+                <span class="badge bg-{% if u.ativa %}success{% else %}secondary{% endif %}">
+                  {{ "Ativa" if u.ativa else "Inativa" }}
+                </span>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted py-3">Nenhuma unidade.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Usuários -->
+    <div class="card card-dark">
+      <div class="card-header"><h6 class="fw-bold mb-0"><i class="bi bi-people-fill text-gold me-2"></i>Usuários</h6></div>
+      <div class="table-responsive">
+        <table class="table table-dark table-hover mb-0 align-middle">
+          <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th class="text-center">Status</th></tr></thead>
+          <tbody>
+            {% for u in usuarios %}
+            <tr>
+              <td>{{ u.nome }}</td>
+              <td class="text-muted small">{{ u.email }}</td>
+              <td><span class="badge bg-{{ u.role_badge_color }}">{{ u.papel_label }}</span></td>
+              <td class="text-center">
+                <span class="badge bg-{% if u.ativo %}success{% else %}secondary{% endif %}">
+                  {{ "Ativo" if u.ativo else "Inativo" }}
+                </span>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-3">Nenhum usuário.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

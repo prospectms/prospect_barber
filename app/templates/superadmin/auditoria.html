@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Auditoria — Superadmin{% endblock %}
+{% block page_title %}Trilha de auditoria{% endblock %}
+
+{% block content %}
+<div class="mb-4 mt-2">
+  <h5 class="fw-bold mb-0">Acessos de superadmin a dados de empresas</h5>
+  <p class="text-muted small mb-0">Últimos {{ logs|length }} registro(s)</p>
+</div>
+
+<div class="card card-dark">
+  <div class="table-responsive">
+    <table class="table table-dark table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Data/hora</th>
+          <th>Superadmin</th>
+          <th>Empresa acessada</th>
+          <th>Ação</th>
+          <th>Detalhe</th>
+          <th>IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td class="text-muted small">{{ log.criado_em.strftime('%d/%m/%Y %H:%M:%S') if log.criado_em else "—" }}</td>
+          <td>{{ log.usuario.nome if log.usuario else "—" }}</td>
+          <td>
+            {% if log.empresa %}
+            <a href="{{ url_for('superadmin.empresa_detail', empresa_id=log.empresa.id) }}" class="text-gold">
+              {{ log.empresa.nome }}
+            </a>
+            {% else %}—{% endif %}
+          </td>
+          <td><code class="small">{{ log.acao }}</code></td>
+          <td class="text-muted small">{{ log.detalhe or "—" }}</td>
+          <td class="text-muted small">{{ log.ip or "—" }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="text-center text-muted py-5">Nenhum acesso registrado ainda.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
