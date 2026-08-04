@@ -12,6 +12,7 @@ from app.auth.forms import (
     AdminResetPasswordForm, ProfileForm, ChangePasswordForm,
 )
 from app.utils.decorators import requer_papel
+from app.utils.limites import requer_limite
 from app.utils.tenant_context import unidades_do_usuario, usuario_pode_acessar_unidade
 
 auth_bp = Blueprint("auth", __name__)
@@ -275,6 +276,7 @@ def _unidades_choices():
 @auth_bp.route("/users/new", methods=["GET", "POST"])
 @login_required
 @requer_papel("dono", "gerente")
+@requer_limite("usuario")
 def new_user():
     form = RegisterUserForm()
     form.unidades_ids.choices = _unidades_choices()

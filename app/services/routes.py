@@ -5,6 +5,7 @@ from app.extensions import db
 from app.models.servico import Servico
 from app.services.forms import ServiceForm
 from app.utils.decorators import requer_papel, requer_unidade
+from app.utils.limites import requer_limite
 
 services_bp = Blueprint("services", __name__)
 
@@ -52,6 +53,7 @@ def index():
 @login_required
 @requer_papel("dono", "gerente")
 @requer_unidade
+@requer_limite("servico")
 def new():
     form = ServiceForm(unidade_id=g.unidade_id)
     if request.method == "GET":
