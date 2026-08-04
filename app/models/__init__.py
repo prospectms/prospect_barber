@@ -1,4 +1,5 @@
 from .tenant import TenantMixin, UnidadeMixin, tenant_bypass, current_empresa_id
+from .plano import Plano
 from .empresa import Empresa
 from .unidade import Unidade
 from .usuario import Usuario
@@ -8,6 +9,7 @@ from .profissional import Profissional
 from .cliente import Cliente
 from .servico import Servico
 from .agendamento import Agendamento
+from .uso_mensal import UsoMensal
 from .raffle import Raffle, RaffleWinner
 from .service_kit import ServiceKit, ServiceKitItem
 from .subscription_plan import SubscriptionPlan, SubscriptionPlanCredit
@@ -19,6 +21,7 @@ __all__ = [
     "UnidadeMixin",
     "tenant_bypass",
     "current_empresa_id",
+    "Plano",
     "Empresa",
     "Unidade",
     "Usuario",
@@ -28,6 +31,7 @@ __all__ = [
     "Cliente",
     "Servico",
     "Agendamento",
+    "UsoMensal",
     "Raffle",
     "RaffleWinner",
     "ServiceKit",

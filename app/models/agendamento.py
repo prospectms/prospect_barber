@@ -34,6 +34,14 @@ class Agendamento(TenantMixin, UnidadeMixin, db.Model):
     barber_id = db.Column(db.Integer, db.ForeignKey("barbers.id"), nullable=False)
     service_id = db.Column(db.Integer, db.ForeignKey("services.id"), nullable=False)
     kit_id = db.Column(db.Integer, db.ForeignKey("service_kit.id"), nullable=True)
+    # Preenchido só pelo fluxo de remarcação do portal do cliente (aponta
+    # pro Agendamento cancelado que deu origem a este). NULL = criação real
+    # (painel ou agenda pública). UsoMensal só incrementa quando NULL — uma
+    # remarcação não deve empurrar a empresa artificialmente pro limite
+    # mensal só porque o cliente trocou de horário. Ver app/utils/limites.py.
+    agendamento_original_id = db.Column(
+        db.Integer, db.ForeignKey("appointments.id"), nullable=True
+    )
     scheduled_date = db.Column(db.Date, nullable=False)
     scheduled_time = db.Column(db.Time, nullable=False)
     status = db.Column(db.String(20), nullable=False, default="pending")

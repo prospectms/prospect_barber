@@ -20,9 +20,19 @@ class Empresa(db.Model):
     telefone = db.Column(db.String(20), nullable=True)
     slug = db.Column(db.String(80), unique=True, nullable=False, index=True)
 
-    # Placeholder simples — tabela Plano/limites reais só na Fase 2.
-    plano_id = db.Column(db.Integer, nullable=False, default=1)
+    # FK real desde a Fase 2 (planos/limites) — era Integer solto na Fase 1-A,
+    # "placeholder simples" documentado no próprio comentário anterior.
+    # default=1 == plano "free", garantido pela ordem de seed da migração.
+    plano_id = db.Column(db.Integer, db.ForeignKey("planos.id"), nullable=False, default=1)
     status_assinatura = db.Column(db.String(20), nullable=False, default="ativa")
+
+    # periodicidade/preco_congelado só fazem sentido depois que a empresa
+    # contrata um plano pago pela primeira vez (checkout ainda é stub nesta
+    # fase — ver app/upgrade/routes.py). preco_congelado NUNCA é recalculado
+    # por reajuste futuro da tabela de preços do Plano; só muda em novo
+    # ciclo de cobrança ou upgrade explícito.
+    periodicidade = db.Column(db.String(10), nullable=True)  # 'mensal'|'anual'
+    preco_congelado = db.Column(db.Numeric(10, 2), nullable=True)
 
     # Guardados desde já, não consumidos nesta fase (ver relatório Fase 0, item 5).
     logo_url = db.Column(db.String(255), nullable=True)
@@ -33,6 +43,7 @@ class Empresa(db.Model):
     unidades = db.relationship(
         "Unidade", back_populates="empresa", cascade="all, delete-orphan"
     )
+    plano = db.relationship("Plano", back_populates="empresas")
 
     def __repr__(self) -> str:
         return f"<Empresa {self.nome!r} ({self.slug})>"
