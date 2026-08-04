@@ -1,18 +1,23 @@
 """
 Fixtures da suíte de testes da Fase 1-A.
 
-Roda contra SQLite local em arquivo (scratchpad), não contra o Neon. Uma
-primeira tentativa usou um banco Postgres dedicado (prospect_barber_test)
-no mesmo projeto Neon do dev — funcionalmente correto, mas cada teste
-monta 2 empresas completas (~10 INSERTs cada) e o volume de conexões
-curtas abertas/fechadas em sequência (uma por fixture, via `with
-app.app_context()`) esgotava o pool do lado do Neon meio da suíte, travando
-sem erro claro em vez de falhar rápido. SQLite elimina a variável de rede
-por completo — o que este arquivo testa é isolamento por empresa_id/
-unidade_id na camada de aplicação (Python/SQLAlchemy), que não depende de
-nenhum recurso específico do Postgres. A migração/schema real já foi
-validada à parte contra o Neon (dry-run + aplicação documentados nos
-commits anteriores desta fase); aqui o alvo é o comportamento das rotas.
+Por padrão roda contra SQLite local em arquivo (scratchpad) — rápido pro
+dia a dia de desenvolvimento, sem depender de rede. Para a confirmação
+final contra Postgres de verdade, defina TEST_DB_BACKEND=postgres (usa um
+banco descartável dedicado no mesmo projeto Neon do dev, nunca o neondb).
+
+`empresa_a`/`empresa_b` são fixtures de ESCOPO DE MÓDULO — construídas uma
+única vez por arquivo de teste, não a cada função. Nenhum teste da suíte
+muta as linhas que elas criam (as tentativas de mutação cross-tenant são
+bloqueadas antes de escrever qualquer coisa — é literalmente isso que
+essas categorias verificam), então reaproveitar entre testes do mesmo
+arquivo é seguro e corta o volume de round-trips ao banco em ~N vezes
+(N = testes por arquivo). Isso importa mais contra Postgres: a primeira
+tentativa (fixture por função, ~10 INSERTs cada, 2 empresas por teste)
+esgotava o pool de conexões do lado do Neon no meio da suíte. `client`
+continua com escopo de função — cada teste precisa de sessão HTTP própria
+(cookies/login), isso não tem relação com o custo de montar empresa/
+unidade/usuário.
 
 `empresa_a`/`empresa_b` criam duas empresas completas e independentes
 (Usuario dono + gerente + funcionário, Profissional, Cliente, Servico,
@@ -22,15 +27,28 @@ de isolamento tenham dado de verdade pra tentar vazar.
 import os
 from datetime import date, time
 
-_TEST_DB_PATH = os.path.join(
-    r"C:\Users\NB-ALEX\AppData\Local\Temp\claude\d--Facul-barber-barber-prospect"
-    r"\28317b5c-a259-4515-8ca4-71232707d571\scratchpad",
-    "prospect_barber_test.db",
-)
-if os.path.exists(_TEST_DB_PATH):
-    os.remove(_TEST_DB_PATH)
+_BACKEND = os.environ.get("TEST_DB_BACKEND", "sqlite")
 
-os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB_PATH}"
+if _BACKEND == "postgres":
+    # Banco descartável dedicado — mesmo projeto Neon do dev, nunca o
+    # neondb. Precisa já ter o schema aplicado via `flask db upgrade`
+    # antes de rodar a suíte (não é recriado aqui).
+    _DB_URL = (
+        "postgresql://neondb_owner:***REMOVED-CREDENCIAL-ROTACIONADA***@"
+        "ep-lingering-mode-ac38l7oo-pooler.sa-east-1.aws.neon.tech/"
+        "migration_dryrun?sslmode=require"
+    )
+else:
+    _TEST_DB_PATH = os.path.join(
+        r"C:\Users\NB-ALEX\AppData\Local\Temp\claude\d--Facul-barber-barber-prospect"
+        r"\28317b5c-a259-4515-8ca4-71232707d571\scratchpad",
+        "prospect_barber_test.db",
+    )
+    if os.path.exists(_TEST_DB_PATH):
+        os.remove(_TEST_DB_PATH)
+    _DB_URL = f"sqlite:///{_TEST_DB_PATH}"
+
+os.environ["DATABASE_URL"] = _DB_URL
 os.environ["FLASK_CONFIG"] = "development"
 
 import pytest
@@ -55,9 +73,18 @@ _TABLES = [
 @pytest.fixture(scope="session")
 def app():
     application = create_app("development")
-    application.config.update(WTF_CSRF_ENABLED=False, TESTING=True, SERVER_NAME="localhost")
+    config = dict(WTF_CSRF_ENABLED=False, TESTING=True, SERVER_NAME="localhost")
+    if _BACKEND == "postgres":
+        # DevelopmentConfig não liga pool_pre_ping (só ProductionConfig
+        # tem — ver app/config.py). Sem isso, uma conexão do pool do Neon
+        # que caiu por ociosidade trava/erra na primeira query seguinte em
+        # vez de ser descartada e recriada.
+        config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True, "pool_recycle": 280}
+    application.config.update(config)
     with application.app_context():
-        _db.drop_all()
+        # Schema já existe (baseline + migração multi-tenant aplicadas via
+        # Alembic antes da suíte, no caso Postgres). create_all() só
+        # preenche o que não existir — idempotente, não recria do zero.
         _db.create_all()
     yield application
 
@@ -67,12 +94,13 @@ def db(app):
     return _db
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="module")
 def _clean_db(app, db):
-    """Apaga tudo depois de CADA teste — cada teste começa com o banco vazio
-    e monta suas próprias empresa_a/empresa_b, sem vazamento entre testes.
-    DELETE tabela a tabela (não TRUNCATE, que é sintaxe só de Postgres) na
-    ordem filhos->pais pra respeitar FK."""
+    """Apaga tudo ao FIM de cada módulo de teste — module-scoped porque
+    empresa_a/empresa_b (abaixo) também são: cada arquivo monta seu dado
+    uma vez e todos os testes daquele arquivo reaproveitam. DELETE tabela
+    a tabela (não TRUNCATE, que é sintaxe só de Postgres) na ordem
+    filhos->pais pra respeitar FK em qualquer um dos dois backends."""
     yield
     with app.app_context():
         for table in _TABLES:
@@ -180,13 +208,13 @@ def _build_empresa(db, tag: str, cpf: str):
     }
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def empresa_a(app, db):
     with app.app_context():
         return _build_empresa(db, "a", cpf="111.444.777-35")
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def empresa_b(app, db):
     with app.app_context():
         return _build_empresa(db, "b", cpf="111.444.777-35")  # MESMO CPF de propósito (categoria 3)
