@@ -168,6 +168,20 @@ def _register_context_processors(app: Flask) -> None:
     def inject_now():
         return {"now": datetime.now(timezone.utc)}
 
+    @app.context_processor
+    def inject_tenant_context():
+        """Expõe a Unidade ativa (objeto, não só o ID) pros templates —
+        sidebar/topbar mostram nome/slug sem cada view precisar passar isso
+        manualmente. Unidade.query.get() já reforça que ela pertence a
+        g.empresa_id (TenantQuery, ver app/models/tenant.py); se por algum
+        motivo unidade_id não bater com a empresa do usuário, isso retorna
+        None em vez de vazar a unidade de outra empresa."""
+        from app.models.unidade import Unidade
+        unidade_ativa = None
+        if getattr(g, "unidade_id", None):
+            unidade_ativa = Unidade.query.get(g.unidade_id)
+        return {"unidade_ativa": unidade_ativa}
+
 
 def _register_template_filters(app: Flask) -> None:
     import re

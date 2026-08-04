@@ -38,15 +38,15 @@
 
       <div class="mb-3">
         <label class="form-label fw-semibold small text-muted text-uppercase ls-1">
-          <i class="bi bi-person me-1"></i>{{ form.username.label.text }}
+          <i class="bi bi-envelope me-1"></i>{{ form.email.label.text }}
         </label>
-        {{ form.username(
-            class="form-control form-control-lg input-dark" + (" is-invalid" if form.username.errors else ""),
-            placeholder="Seu nome de usuário",
-            autocomplete="username",
+        {{ form.email(
+            class="form-control form-control-lg input-dark" + (" is-invalid" if form.email.errors else ""),
+            placeholder="seu@email.com",
+            autocomplete="email",
             autofocus=true
         ) }}
-        {% for e in form.username.errors %}
+        {% for e in form.email.errors %}
           <div class="invalid-feedback">{{ e }}</div>
         {% endfor %}
       </div>
@@ -91,6 +91,10 @@
     <p class="text-center text-muted small mt-4 mb-0">
       <i class="bi bi-shield-check me-1 text-gold"></i>
       Acesso restrito a usuários autorizados
+    </p>
+    <p class="text-center small mt-2 mb-0">
+      Ainda não tem uma empresa cadastrada?
+      <a href="{{ url_for('auth.cadastro') }}" class="text-gold fw-semibold">Criar agora</a>
     </p>
   </div>
 </div>

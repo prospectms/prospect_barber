@@ -34,15 +34,23 @@
         <tr class="{% if not u.is_active %}opacity-50{% endif %}">
           <!-- Avatar -->
           <td>
-            <div class="avatar-sm {% if u.is_admin %}avatar-admin{% else %}avatar-barber{% endif %}">
+            <div class="avatar-sm {% if u.pode_gerenciar %}avatar-admin{% else %}avatar-barber{% endif %}">
               {{ u.display_name[0]|upper }}
             </div>
           </td>
 
           <!-- Usuário -->
           <td>
-            <div class="fw-semibold">{{ u.username }}</div>
-            <div class="text-muted small">{{ u.display_name if u.is_barber else 'Administrador' }}</div>
+            <div class="fw-semibold">{{ u.nome }}</div>
+            <div class="text-muted small">
+              {% if u.pode_gerenciar %}
+                Todas as unidades
+              {% elif u.unidades_vinculadas %}
+                {{ u.unidades_vinculadas|map(attribute='unidade.nome')|join(', ') }}
+              {% else %}
+                <span class="fst-italic">Sem unidade vinculada</span>
+              {% endif %}
+            </div>
           </td>
 
           <!-- E-mail -->
@@ -51,9 +59,14 @@
           <!-- Role badge -->
           <td>
             <span class="badge bg-{{ u.role_badge_color }} px-2 py-1">
-              <i class="bi bi-{% if u.is_admin %}shield-fill{% else %}scissors{% endif %} me-1"></i>
-              {{ u.role_label }}
+              <i class="bi bi-{% if u.pode_gerenciar %}shield-fill{% else %}scissors{% endif %} me-1"></i>
+              {{ u.papel_label }}
             </span>
+            {% if u.is_superadmin %}
+            <span class="badge bg-dark border border-gold text-gold px-2 py-1" title="Acesso a todas as empresas">
+              <i class="bi bi-stars me-1"></i>Superadmin
+            </span>
+            {% endif %}
           </td>
 
           <!-- Status -->
@@ -121,7 +134,7 @@
 
               <!-- Excluir -->
               <form method="POST" action="{{ url_for('auth.delete_user', user_id=u.id) }}"
-                    data-username="{{ u.username }}"
+                    data-username="{{ u.nome }}"
                     onsubmit="return confirm('Excluir o usuário ' + this.dataset.username + '? Esta ação não pode ser desfeita.')">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
@@ -147,8 +160,9 @@
 
 <!-- Legenda -->
 <div class="d-flex gap-4 mt-3 flex-wrap">
-  <span class="text-muted small"><span class="badge bg-gold text-dark me-1">Admin</span> Acesso total ao sistema</span>
-  <span class="text-muted small"><span class="badge bg-info me-1">Barbeiro</span> Acesso aos próprios agendamentos</span>
+  <span class="text-muted small"><span class="badge bg-gold text-dark me-1">Dono</span> Acesso total à empresa</span>
+  <span class="text-muted small"><span class="badge bg-info me-1">Gerente</span> Mesmo acesso do dono, exceto excluir a empresa</span>
+  <span class="text-muted small"><span class="badge bg-secondary me-1">Funcionário</span> Só as unidades vinculadas</span>
   <span class="text-muted small"><span class="badge bg-warning text-dark me-1"><i class="bi bi-lock-fill"></i> Bloqueado</span> Muitas tentativas de login</span>
 </div>
 {% endblock %}

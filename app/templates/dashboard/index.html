@@ -184,11 +184,11 @@
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
   <div class="dash-greeting">
     <h5 class="fw-bold mb-0">
-      {% if current_user.is_admin %}Visão geral do negócio{% else %}Minha performance{% endif %}
+      {% if current_user.pode_gerenciar %}Visão geral do negócio{% else %}Minha performance{% endif %}
     </h5>
     <p class="text-muted small mb-0">{{ today_label }}</p>
   </div>
-  {% if current_user.is_admin %}
+  {% if current_user.pode_gerenciar %}
   <div class="d-flex gap-2">
     <a href="{{ url_for('appointments.book') }}" class="btn btn-sm btn-outline-gold" target="_blank">
       <i class="bi bi-link-45deg me-1"></i>Link público
@@ -251,7 +251,7 @@
   </div>
 
   <div class="col-6 col-xl-3">
-    {% if current_user.is_admin %}
+    {% if current_user.pode_gerenciar %}
     <div class="kpi-card">
       <div class="d-flex align-items-start justify-content-between mb-3">
         <div class="kpi-icon bg-info-soft">
@@ -316,7 +316,7 @@
       </div>
       <div class="chart-body d-flex flex-column gap-2">
 
-        {% if current_user.is_admin %}
+        {% if current_user.pode_gerenciar %}
         <a href="{{ url_for('appointments.new') }}" class="quick-action-btn quick-action-primary">
           <i class="bi bi-plus-circle-fill"></i>Novo agendamento
         </a>
@@ -362,7 +362,7 @@
 <!-- ══ ROW 3 — Barbeiros + Serviços ══════════════════════════════ -->
 <div class="row g-3 mb-4">
 
-  {% if current_user.is_admin %}
+  {% if current_user.pode_gerenciar %}
   <div class="col-12 col-xl-6">
     <div class="chart-card">
       <div class="chart-header">
@@ -413,7 +413,7 @@
   {% endif %}
 
   <!-- Serviços -->
-  <div class="col-12 {% if current_user.is_admin %}col-xl-6{% endif %}">
+  <div class="col-12 {% if current_user.pode_gerenciar %}col-xl-6{% endif %}">
     <div class="chart-card">
       <div class="chart-header">
         <h6 class="fw-bold">
@@ -484,7 +484,7 @@
             <tr>
               <th style="width:120px">Data / Hora</th>
               <th>Cliente</th>
-              {% if current_user.is_admin %}
+              {% if current_user.pode_gerenciar %}
               <th class="d-none d-md-table-cell">Barbeiro</th>
               {% endif %}
               <th class="d-none d-lg-table-cell">Serviço</th>
@@ -510,7 +510,7 @@
                 </div>
                 {% endif %}
               </td>
-              {% if current_user.is_admin %}
+              {% if current_user.pode_gerenciar %}
               <td class="d-none d-md-table-cell text-muted small">
                 {{ a.barber.name if a.barber else '—' }}
               </td>
@@ -538,7 +538,7 @@
         <p class="text-muted small mb-3">
           Nenhum agendamento pendente ou confirmado a partir de hoje.
         </p>
-        {% if current_user.is_admin %}
+        {% if current_user.pode_gerenciar %}
         <a href="{{ url_for('appointments.new') }}" class="btn btn-gold btn-sm">
           <i class="bi bi-plus-circle me-1"></i>Criar agendamento
         </a>
@@ -664,7 +664,7 @@ Chart.defaults.font.size   = 11;
 })();
 {% endif %}
 
-{% if current_user.is_admin and top_barbers %}
+{% if current_user.pode_gerenciar and top_barbers %}
 /* ── 3. Barbeiros — horizontal bar ─────────────────────────── */
 (function () {
   const ctx = document.getElementById('barbersChart').getContext('2d');

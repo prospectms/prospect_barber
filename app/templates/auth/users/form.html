@@ -10,27 +10,25 @@
       <div class="card-header">
         <h6 class="fw-bold mb-0">
           <i class="bi bi-person-{% if is_edit %}gear{% else %}plus{% endif %}-fill text-gold me-2"></i>
-          {% if is_edit %}Editando — {{ user.username }}{% else %}Criar novo usuário{% endif %}
+          {% if is_edit %}Editando — {{ user.nome }}{% else %}Criar novo usuário{% endif %}
         </h6>
       </div>
       <div class="card-body p-4">
         <form method="POST" novalidate>
           {{ form.hidden_tag() }}
 
-          <!-- Credenciais (só no cadastro) -->
-          {% if not is_edit %}
+          <!-- Dados da conta -->
           <p class="text-muted small text-uppercase mb-3" style="letter-spacing:1px; font-size:.7rem">
-            <i class="bi bi-key me-1 text-gold"></i>Credenciais de acesso
+            <i class="bi bi-person me-1 text-gold"></i>Dados da conta
           </p>
           <div class="row g-3 mb-3">
             <div class="col-md-6">
-              <label class="form-label fw-semibold small">{{ form.username.label.text }} *</label>
-              {{ form.username(
-                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.username.errors else ""),
-                  placeholder="login do usuário",
-                  autocomplete="off"
+              <label class="form-label fw-semibold small">{{ form.nome.label.text }} *</label>
+              {{ form.nome(
+                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.nome.errors else ""),
+                  placeholder="Nome completo"
               ) }}
-              {% for e in form.username.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+              {% for e in form.nome.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
             </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold small">{{ form.email.label.text }} *</label>
@@ -40,6 +38,8 @@
               ) }}
               {% for e in form.email.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
             </div>
+
+            {% if not is_edit %}
             <div class="col-md-6">
               <label class="form-label fw-semibold small">{{ form.password.label.text }} *</label>
               {{ form.password(
@@ -56,70 +56,64 @@
               ) }}
               {% for e in form.confirm_password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
             </div>
+            {% else %}
+            <div class="col-12">
+              <p class="text-muted small mb-0">
+                <i class="bi bi-info-circle me-1"></i>
+                Para trocar a senha, use
+                <a href="{{ url_for('auth.reset_password', user_id=user.id) }}" class="text-gold">Redefinir senha</a>.
+              </p>
+            </div>
+            {% endif %}
           </div>
           <hr class="border-secondary">
-          {% else %}
-          <!-- Em edição: mostrar campos username e email -->
-          <p class="text-muted small text-uppercase mb-3" style="letter-spacing:1px; font-size:.7rem">
-            <i class="bi bi-person me-1 text-gold"></i>Dados da conta
-          </p>
-          <div class="row g-3 mb-3">
-            <div class="col-md-6">
-              <label class="form-label fw-semibold small">{{ form.username.label.text }} *</label>
-              {{ form.username(
-                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.username.errors else "")
-              ) }}
-              {% for e in form.username.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold small">{{ form.email.label.text }} *</label>
-              {{ form.email(
-                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.email.errors else "")
-              ) }}
-              {% for e in form.email.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
-            </div>
-          </div>
-          <hr class="border-secondary">
-          {% endif %}
 
-          <!-- Perfil e configurações -->
+          <!-- Perfil de acesso -->
           <p class="text-muted small text-uppercase mb-3" style="letter-spacing:1px; font-size:.7rem">
             <i class="bi bi-shield me-1 text-gold"></i>Perfil de acesso
           </p>
           <div class="row g-3 mb-3">
             <div class="col-md-6">
-              <label class="form-label fw-semibold small">{{ form.role.label.text }}</label>
-              {{ form.role(
+              <label class="form-label fw-semibold small">{{ form.papel.label.text }}</label>
+              {{ form.papel(
                   class="form-select bg-dark border-secondary text-light",
-                  id="roleSelect"
+                  id="papelSelect"
               ) }}
             </div>
             {% if is_edit %}
             <div class="col-md-6 d-flex align-items-end">
               <div class="form-check form-switch ms-2">
-                {{ form.is_active(class="form-check-input", role="switch") }}
-                <label class="form-check-label" for="{{ form.is_active.id }}">Conta ativa</label>
+                {{ form.ativo(class="form-check-input", role="switch") }}
+                <label class="form-check-label" for="{{ form.ativo.id }}">Conta ativa</label>
               </div>
             </div>
             {% endif %}
           </div>
 
-          <!-- Seção do perfil barbeiro (visível só quando role = barber) -->
+          <!-- Unidades vinculadas (obrigatório para funcionário) -->
+          <div id="unidadesSection">
+            <div class="mb-3">
+              <label class="form-label fw-semibold small">{{ form.unidades_ids.label.text }}</label>
+              {{ form.unidades_ids(
+                  class="form-select bg-dark border-secondary text-light" + (" is-invalid" if form.unidades_ids.errors else ""),
+                  size=4
+              ) }}
+              <div class="form-text">Segure Ctrl (ou Cmd) para selecionar mais de uma unidade.</div>
+              {% for e in form.unidades_ids.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+
           {% if not is_edit %}
-          <div id="barberSection">
-            <hr class="border-secondary">
-            <p class="text-muted small text-uppercase mb-3" style="letter-spacing:1px; font-size:.7rem">
-              <i class="bi bi-scissors me-1 text-gold"></i>Perfil do barbeiro
-            </p>
+          <!-- Perfil de profissional (opcional, qualquer papel) -->
+          <hr class="border-secondary">
+          <div class="form-check mb-3">
+            {{ form.criar_perfil_profissional(class="form-check-input", id="criarProfissionalCheck") }}
+            <label class="form-check-label fw-semibold small" for="criarProfissionalCheck">
+              {{ form.criar_perfil_profissional.label.text }}
+            </label>
+          </div>
+          <div id="profissionalSection" style="display:none">
             <div class="row g-3">
-              <div class="col-12">
-                <label class="form-label fw-semibold small">{{ form.name.label.text }} *</label>
-                {{ form.name(
-                    class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.name.errors else ""),
-                    placeholder="Nome que aparece para os clientes"
-                ) }}
-                {% for e in form.name.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
-              </div>
               <div class="col-md-6">
                 <label class="form-label fw-semibold small">{{ form.phone.label.text }}</label>
                 {{ form.phone(
@@ -151,17 +145,29 @@
 {% endblock %}
 
 {% block extra_js %}
-{% if not is_edit %}
 <script>
-  const roleSelect    = document.getElementById("roleSelect");
-  const barberSection = document.getElementById("barberSection");
+  const papelSelect      = document.getElementById("papelSelect");
+  const unidadesSection  = document.getElementById("unidadesSection");
+  const criarProfissional = document.getElementById("criarProfissionalCheck");
+  const profissionalSection = document.getElementById("profissionalSection");
 
-  function toggleBarber() {
-    barberSection.style.display = roleSelect.value === "barber" ? "block" : "none";
+  function toggleUnidades() {
+    const precisaUnidade = papelSelect.value === "funcionario"
+      || (criarProfissional && criarProfissional.checked);
+    unidadesSection.style.display = precisaUnidade ? "block" : "none";
   }
 
-  roleSelect.addEventListener("change", toggleBarber);
-  toggleBarber(); // aplica ao carregar
+  function toggleProfissional() {
+    if (!profissionalSection) return;
+    profissionalSection.style.display = criarProfissional.checked ? "block" : "none";
+    toggleUnidades();
+  }
+
+  papelSelect.addEventListener("change", toggleUnidades);
+  if (criarProfissional) {
+    criarProfissional.addEventListener("change", toggleProfissional);
+    toggleProfissional();
+  }
+  toggleUnidades();
 </script>
-{% endif %}
 {% endblock %}

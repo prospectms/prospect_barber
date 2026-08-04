@@ -32,6 +32,19 @@
     </div>
   </a>
 
+  <!-- Unidade ativa — dono/gerente trocam livremente; funcionário só entre
+       as unidades vinculadas (ver auth.selecionar_unidade). -->
+  <a href="{{ url_for('auth.selecionar_unidade') }}"
+     class="sidebar-link {% if request.endpoint == 'auth.selecionar_unidade' %}active{% endif %}"
+     style="margin: 0 12px 8px; border: 1px solid var(--border-subtle); border-radius: var(--r-sm);">
+    <i class="bi bi-shop"></i>
+    <div style="min-width:0">
+      <div class="text-truncate" style="max-width:170px; font-size:.8rem;">
+        {{ unidade_ativa.nome if unidade_ativa else "Selecionar unidade" }}
+      </div>
+    </div>
+  </a>
+
   <nav class="sidebar-nav">
 
     <!-- Todos os usuários -->
@@ -44,8 +57,8 @@
       <i class="bi bi-calendar-check-fill"></i><span>Agendamentos</span>
     </a>
 
-    <!-- Admin only -->
-    {% if current_user.is_admin %}
+    <!-- Dono/gerente only -->
+    {% if current_user.pode_gerenciar %}
     <div class="sidebar-section">Gestão</div>
     <a href="{{ url_for('customers.index') }}"
        class="sidebar-link {% if request.blueprint == 'customers' %}active{% endif %}">
@@ -53,13 +66,18 @@
     </a>
     <a href="{{ url_for('barbers.index') }}"
        class="sidebar-link {% if request.blueprint == 'barbers' %}active{% endif %}">
-      <i class="bi bi-person-badge-fill"></i><span>Barbeiros</span>
+      <i class="bi bi-person-badge-fill"></i><span>Profissionais</span>
     </a>
     <a href="{{ url_for('services.index') }}"
        class="sidebar-link {% if request.blueprint == 'services' %}active{% endif %}">
       <i class="bi bi-stars"></i><span>Serviços</span>
     </a>
 
+    <!-- Sorteios/Assinaturas: bloqueados por feature flag na Fase 1-A (ver
+         app/utils/feature_flags.py) — o link fica visível aqui de propósito
+         (painel autenticado), clicar mostra aviso "temporariamente
+         indisponível". Diferente da agenda pública/portal do cliente, onde
+         não deve aparecer nada equivalente. -->
     <a href="{{ url_for('subscriptions.index') }}"
        class="sidebar-link {% if request.blueprint == 'subscriptions' %}active{% endif %}">
       <i class="bi bi-award-fill"></i><span>Assinaturas</span>
@@ -74,16 +92,26 @@
        class="sidebar-link {% if request.blueprint == 'reports' %}active{% endif %}">
       <i class="bi bi-bar-chart-fill"></i><span>Relatórios</span>
     </a>
-    <a href="{{ url_for('client.lookup') }}"
+    {% if unidade_ativa %}
+    <a href="{{ url_for('client.lookup', slug=unidade_ativa.slug) }}"
        class="sidebar-link {% if request.blueprint == 'client' %}active{% endif %}"
        target="_blank" rel="noopener">
       <i class="bi bi-person-vcard-fill"></i><span>Portal Cliente</span>
     </a>
+    {% endif %}
 
     <div class="sidebar-section">Sistema</div>
     <a href="{{ url_for('auth.users') }}"
        class="sidebar-link {% if request.blueprint == 'auth' and 'user' in request.endpoint %}active{% endif %}">
       <i class="bi bi-shield-lock-fill"></i><span>Usuários</span>
+    </a>
+    {% endif %}
+
+    {% if current_user.is_superadmin %}
+    <div class="sidebar-section">Prospect</div>
+    <a href="{{ url_for('superadmin.empresas') }}"
+       class="sidebar-link {% if request.blueprint == 'superadmin' %}active{% endif %}">
+      <i class="bi bi-building-gear"></i><span>Empresas</span>
     </a>
     {% endif %}
 
@@ -97,7 +125,7 @@
       <div style="min-width:0">
         <div class="text-truncate" style="max-width:155px">{{ current_user.display_name|truncate(20, True) }}</div>
         <div style="font-size:.62rem;color:var(--text-muted);line-height:1;margin-top:1px">
-          {{ current_user.role_label }}
+          {{ current_user.papel_label }}
         </div>
       </div>
     </a>
@@ -122,8 +150,8 @@
     <div class="topbar-user">
       <span class="badge topbar-badge d-none d-sm-inline-flex
                    bg-{{ current_user.role_badge_color }} bg-opacity-80">
-        <i class="bi bi-{% if current_user.is_admin %}shield-fill{% else %}scissors{% endif %}"></i>
-        {{ current_user.role_label }}
+        <i class="bi bi-{% if current_user.pode_gerenciar %}shield-fill{% else %}scissors{% endif %}"></i>
+        {{ current_user.papel_label }}
       </span>
       <a href="{{ url_for('auth.profile') }}" class="topbar-avatar" title="Meu perfil">
         {{ current_user.display_name[0]|upper }}

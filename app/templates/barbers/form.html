@@ -80,38 +80,25 @@
         <div class="col-md-8 col-lg-9">
 
           {% if not is_edit %}
-          <!-- ═ Seção: Conta de acesso ═══════════════════ -->
+          <!-- ═ Seção: Vínculo com usuário ═══════════════ -->
           <div class="card card-dark mb-4">
             <div class="card-header">
               <h6 class="fw-bold mb-0">
-                <i class="bi bi-key-fill text-gold me-2"></i>Conta de acesso ao sistema
+                <i class="bi bi-key-fill text-gold me-2"></i>Conta de acesso (opcional)
               </h6>
             </div>
             <div class="card-body p-4">
+              <p class="text-muted small mb-3">
+                Um profissional pode existir só para aparecer na agenda, sem login
+                próprio. Para dar acesso ao sistema, crie a conta primeiro em
+                <a href="{{ url_for('auth.new_user') }}" class="text-gold">Usuários</a>
+                e vincule-a aqui — ou deixe em branco.
+              </p>
               <div class="row g-3">
                 <div class="col-md-6">
-                  <label class="form-label fw-semibold small">{{ form.username.label.text }} <span class="text-danger">*</span></label>
-                  {{ form.username(class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.username.errors else ""),
-                                  placeholder="login do sistema", autocomplete="off") }}
-                  {% for e in form.username.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label fw-semibold small">{{ form.email.label.text }} <span class="text-danger">*</span></label>
-                  {{ form.email(class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.email.errors else ""),
-                                placeholder="email@dominio.com") }}
-                  {% for e in form.email.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label fw-semibold small">{{ form.password.label.text }} <span class="text-danger">*</span></label>
-                  {{ form.password(class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.password.errors else ""),
-                                   placeholder="Mínimo 6 caracteres") }}
-                  {% for e in form.password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label fw-semibold small">{{ form.confirm_password.label.text }} <span class="text-danger">*</span></label>
-                  {{ form.confirm_password(class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.confirm_password.errors else ""),
-                                           placeholder="Repita a senha") }}
-                  {% for e in form.confirm_password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+                  <label class="form-label fw-semibold small">{{ form.usuario_id.label.text }}</label>
+                  {{ form.usuario_id(class="form-select bg-dark border-secondary text-light" + (" is-invalid" if form.usuario_id.errors else "")) }}
+                  {% for e in form.usuario_id.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
                 </div>
               </div>
             </div>
