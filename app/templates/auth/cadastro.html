@@ -1,0 +1,131 @@
+{% extends "base_public.html" %}
+{% block title %}Criar empresa{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8 col-xl-7">
+
+    <div class="text-center mb-4">
+      <h1 class="h3 fw-bold mb-1" style="font-family:'Playfair Display',Georgia,serif;">
+        Crie sua <span class="text-gold">empresa</span>
+      </h1>
+      <p class="text-muted small mb-0">
+        Isso cria sua empresa, a primeira unidade e sua conta de dono — tudo de uma vez.
+      </p>
+    </div>
+
+    <div class="card card-dark">
+      <div class="card-body p-4">
+        <form method="POST" novalidate>
+          {{ form.hidden_tag() }}
+
+          <!-- Empresa -->
+          <p class="text-muted small text-uppercase mb-3" style="letter-spacing:1px; font-size:.7rem">
+            <i class="bi bi-building me-1 text-gold"></i>Empresa
+          </p>
+          <div class="row g-3 mb-4">
+            <div class="col-12">
+              <label class="form-label fw-semibold small">{{ form.empresa_nome.label.text }} *</label>
+              {{ form.empresa_nome(
+                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.empresa_nome.errors else ""),
+                  placeholder="Ex: Barbearia do João"
+              ) }}
+              {% for e in form.empresa_nome.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ form.empresa_documento.label.text }}</label>
+              {{ form.empresa_documento(class="form-control bg-dark border-secondary text-light", placeholder="00.000.000/0000-00") }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ form.empresa_telefone.label.text }}</label>
+              {{ form.empresa_telefone(class="form-control bg-dark border-secondary text-light", placeholder="(00) 00000-0000") }}
+            </div>
+          </div>
+
+          <!-- Unidade -->
+          <hr class="border-secondary">
+          <p class="text-muted small text-uppercase mb-3" style="letter-spacing:1px; font-size:.7rem">
+            <i class="bi bi-shop me-1 text-gold"></i>Primeira unidade
+          </p>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ form.unidade_nome.label.text }} *</label>
+              {{ form.unidade_nome(
+                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.unidade_nome.errors else ""),
+                  placeholder="Ex: Unidade Centro"
+              ) }}
+              {% for e in form.unidade_nome.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ form.unidade_slug.label.text }} *</label>
+              <div class="input-group">
+                <span class="input-group-text bg-dark border-secondary text-muted small">/agendar/</span>
+                {{ form.unidade_slug(
+                    class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.unidade_slug.errors else ""),
+                    placeholder="barbearia-do-joao"
+                ) }}
+              </div>
+              <div class="form-text">O endereço que seus clientes vão usar pra agendar online.</div>
+              {% for e in form.unidade_slug.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ form.unidade_endereco.label.text }}</label>
+              {{ form.unidade_endereco(class="form-control bg-dark border-secondary text-light", placeholder="Rua, número, bairro") }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ form.unidade_telefone.label.text }}</label>
+              {{ form.unidade_telefone(class="form-control bg-dark border-secondary text-light", placeholder="(00) 00000-0000") }}
+            </div>
+          </div>
+
+          <!-- Dono -->
+          <hr class="border-secondary">
+          <p class="text-muted small text-uppercase mb-3" style="letter-spacing:1px; font-size:.7rem">
+            <i class="bi bi-person-fill me-1 text-gold"></i>Sua conta
+          </p>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ form.dono_nome.label.text }} *</label>
+              {{ form.dono_nome(
+                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.dono_nome.errors else ""),
+              ) }}
+              {% for e in form.dono_nome.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ form.dono_email.label.text }} *</label>
+              {{ form.dono_email(
+                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.dono_email.errors else ""),
+                  placeholder="seu@email.com"
+              ) }}
+              {% for e in form.dono_email.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ form.dono_password.label.text }} *</label>
+              {{ form.dono_password(
+                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.dono_password.errors else ""),
+                  placeholder="Mínimo 6 caracteres"
+              ) }}
+              {% for e in form.dono_password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">{{ form.dono_confirm_password.label.text }} *</label>
+              {{ form.dono_confirm_password(
+                  class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.dono_confirm_password.errors else ""),
+                  placeholder="Repita a senha"
+              ) }}
+              {% for e in form.dono_confirm_password.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+
+          {{ form.submit(class="btn btn-gold btn-lg w-100 fw-bold") }}
+        </form>
+
+        <p class="text-center small text-muted mt-3 mb-0">
+          Já tem uma conta? <a href="{{ url_for('auth.login') }}" class="text-gold">Entrar</a>
+        </p>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

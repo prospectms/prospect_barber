@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Selecionar unidade{% endblock %}
+{% block page_title %}Selecionar unidade{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-3">
+  <div class="col-md-7 col-lg-5">
+    <div class="card card-dark">
+      <div class="card-header">
+        <h6 class="fw-bold mb-0"><i class="bi bi-shop text-gold me-2"></i>Unidade ativa</h6>
+      </div>
+      <div class="card-body p-4">
+
+        {% if not unidades %}
+        <p class="text-muted mb-0">
+          Nenhuma unidade disponível para o seu usuário. Contate o dono ou gerente da empresa.
+        </p>
+        {% else %}
+        <p class="text-muted small mb-3">
+          Tudo que você vê e faz no painel (agendamentos, clientes, serviços) é
+          referente à unidade selecionada aqui.
+        </p>
+        <form method="POST" novalidate>
+          {{ form.hidden_tag() }}
+
+          <div class="mb-3">
+            {% for value, label in form.unidade_id.choices %}
+            <label class="d-flex align-items-center gap-2 p-3 mb-2 rounded"
+                   style="border: 1px solid var(--border-medium); cursor: pointer;">
+              <input type="radio" name="{{ form.unidade_id.name }}" value="{{ value }}"
+                     {% if form.unidade_id.data == value %}checked{% endif %} class="form-check-input mt-0">
+              <span>{{ label }}</span>
+              {% if unidade_ativa and unidade_ativa.id == value %}
+              <span class="badge bg-gold text-dark ms-auto">Atual</span>
+              {% endif %}
+            </label>
+            {% endfor %}
+            {% for e in form.unidade_id.errors %}
+              <div class="text-danger small">{{ e }}</div>
+            {% endfor %}
+          </div>
+
+          {{ form.submit(class="btn btn-gold px-4") }}
+          <a href="{{ url_for('dashboard.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+        </form>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
