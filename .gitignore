@@ -29,3 +29,6 @@ app/static/reports/
 # OS
 .DS_Store
 Thumbs.db
+
+# Testes
+.pytest_cache/
