@@ -7,6 +7,7 @@ from flask import (
 from flask_login import login_required
 
 from app.utils.decorators import requer_papel, requer_unidade
+from app.utils.limites import requer_modulo
 from app.reports.generators import (
     build_appointments, build_revenue,
     build_services, build_barbers,
@@ -32,6 +33,7 @@ _MIMETYPES = {
 @reports_bp.route("/")
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("relatorios")
 @requer_unidade
 def index():
     today = date.today()
@@ -46,6 +48,7 @@ def index():
 @reports_bp.route("/export")
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("relatorios")
 @requer_unidade
 def export():
     report_type = request.args.get("report", "appointments")
@@ -108,6 +111,7 @@ def export():
 @reports_bp.route("/appointments/export")
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("relatorios")
 @requer_unidade
 def export_appointments():
     return redirect(url_for(

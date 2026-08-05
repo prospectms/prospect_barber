@@ -57,13 +57,19 @@ from app import create_app
 from app.extensions import db as _db
 
 # Ordem de dependência (filhos antes dos pais) — mesma usada no downgrade
-# da migração Alembic.
+# da migração Alembic. NÃO inclui "planos" de propósito — são dados de
+# referência seedados uma vez por sessão (ver _seed_planos), não dado de
+# teste por empresa; limpar entre módulos quebraria a FK empresas.plano_id
+# de qualquer empresa criada em um módulo anterior que ainda não rodou
+# _clean_db (não é o caso hoje, mas não há necessidade de recriar a cada
+# módulo mesmo assim — é uma tabela de preço fixa, como no banco real).
 _TABLES = [
     "audit_log", "usuario_unidade",
     "subscription_credit_usage", "subscription_credit_balance", "customer_subscription",
     "subscription_plan_credit", "subscription_plan",
     "raffle_winners", "raffles",
     "service_kit_item", "service_kit",
+    "uso_mensal",
     "appointments", "barber_schedule_exception",
     "services", "barbers", "customers",
     "users", "unidades", "empresas",
@@ -86,12 +92,54 @@ def app():
         # Alembic antes da suíte, no caso Postgres). create_all() só
         # preenche o que não existir — idempotente, não recria do zero.
         _db.create_all()
+        _seed_planos(_db)
     yield application
 
 
 @pytest.fixture(scope="session")
 def db(app):
     return _db
+
+
+def _seed_planos(db) -> dict:
+    """Semeia os 4 planos (mesmos dados da migração real, ver migrations/
+    versions/7a3f9c1d2b4e_planos_e_limites.py) uma vez por sessão de teste.
+    Retorna {nome: id}. Idempotente — se os testes já rodaram nesta sessão
+    (app é session-scoped, isso só executa uma vez mesmo assim), não
+    duplica."""
+    from app.models.plano import Plano
+
+    if Plano.query.count() > 0:
+        return {p.nome: p.id for p in Plano.query.all()}
+
+    dados = [
+        {"nome": "free", "max_unidades": 1, "max_usuarios": 2, "max_servicos": 6,
+         "preco_mensal": 0, "preco_anual": 0, "modulos_incluidos": []},
+        {"nome": "essencial", "max_unidades": 3, "max_usuarios": None, "max_servicos": None,
+         "preco_mensal": 49.99, "preco_anual": 569.89, "modulos_incluidos": []},
+        {"nome": "pro", "max_unidades": 5, "max_usuarios": None, "max_servicos": None,
+         "preco_mensal": 79.99, "preco_anual": 883.09,
+         "modulos_incluidos": ["relatorios", "clube_recorrencia"]},
+        {"nome": "ilimitado", "max_unidades": None, "max_usuarios": None, "max_servicos": None,
+         "preco_mensal": 199.99, "preco_anual": 2159.89,
+         "modulos_incluidos": ["relatorios", "clube_recorrencia"]},
+    ]
+    ids = {}
+    for d in dados:
+        plano = Plano(**d)
+        db.session.add(plano)
+        db.session.flush()
+        ids[plano.nome] = plano.id
+    db.session.commit()
+    return ids
+
+
+@pytest.fixture(scope="session")
+def planos(app, db):
+    """{nome: id} dos 4 planos seedados — use pra testes que precisam de
+    uma empresa num plano específico (ex.: free pra testar bloqueio)."""
+    with app.app_context():
+        return _seed_planos(db)
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -124,12 +172,19 @@ def login(client):
     return _login
 
 
-def _build_empresa(db, tag: str, cpf: str):
+def _build_empresa(db, tag: str, cpf: str, plano_id: int = None):
     """Monta uma empresa completa (2 unidades, dono, gerente, funcionário
     vinculado só à 1ª unidade, profissional, cliente, serviço, agendamento).
     Retorna só valores primitivos (ids/strings) — os objetos ORM ficam
     detached assim que a app-context fecha, então não são reaproveitáveis
-    fora daqui."""
+    fora daqui.
+
+    plano_id=None resolve pro plano "ilimitado" (todos os módulos, sem
+    limite nenhum) — testes de isolamento/IDOR/slug/etc. (Fase 1-A) não
+    são sobre limite de plano, então não devem esbarrar em nenhum bloqueio
+    de pode_criar()/requer_modulo() por acidente. Testes que QUEREM
+    testar limite (Fase 2) criam sua própria empresa com plano_id
+    explícito, não usam empresa_a/empresa_b."""
     from app.models.empresa import Empresa
     from app.models.unidade import Unidade
     from app.models.usuario import Usuario
@@ -138,8 +193,12 @@ def _build_empresa(db, tag: str, cpf: str):
     from app.models.cliente import Cliente
     from app.models.servico import Servico
     from app.models.agendamento import Agendamento
+    from app.models.plano import Plano
 
-    empresa = Empresa(nome=f"Empresa {tag}", slug=f"empresa-{tag}", plano_id=1, status_assinatura="ativa")
+    if plano_id is None:
+        plano_id = Plano.query.filter_by(nome="ilimitado").first().id
+
+    empresa = Empresa(nome=f"Empresa {tag}", slug=f"empresa-{tag}", plano_id=plano_id, status_assinatura="ativa")
     db.session.add(empresa)
     db.session.flush()
 

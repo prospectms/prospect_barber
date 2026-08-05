@@ -8,6 +8,7 @@ from app.models.subscription import (
 )
 from app.models.cliente import Cliente
 from app.utils.decorators import requer_papel
+from app.utils.limites import requer_modulo
 from app.utils.feature_flags import SATELLITE_FEATURES_ENABLED, bloqueado_enquanto_satelite_desativado
 from app.subscriptions.service import get_active_subscription, check_credit, check_credit_kit
 
@@ -54,6 +55,7 @@ def _resolve_end_date(start: date) -> date:
 @subscriptions_bp.route("/")
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("clube_recorrencia")
 @bloqueado_enquanto_satelite_desativado
 def index():
     status_filter = request.args.get("status", "")
@@ -105,6 +107,7 @@ def index():
 @subscriptions_bp.route("/new", methods=["GET", "POST"])
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("clube_recorrencia")
 @bloqueado_enquanto_satelite_desativado
 def new():
     plans = SubscriptionPlan.query.filter_by(active=True).order_by(SubscriptionPlan.name).all()
@@ -179,6 +182,7 @@ def new():
 @subscriptions_bp.route("/<int:sub_id>")
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("clube_recorrencia")
 @bloqueado_enquanto_satelite_desativado
 def detail(sub_id: int):
     sub = CustomerSubscription.query.get_or_404(sub_id)
@@ -200,6 +204,7 @@ def detail(sub_id: int):
 @subscriptions_bp.route("/<int:sub_id>/renew", methods=["POST"])
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("clube_recorrencia")
 @bloqueado_enquanto_satelite_desativado
 def renew(sub_id: int):
     sub = CustomerSubscription.query.get_or_404(sub_id)
@@ -234,6 +239,7 @@ def renew(sub_id: int):
 @subscriptions_bp.route("/<int:sub_id>/cancel", methods=["POST"])
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("clube_recorrencia")
 @bloqueado_enquanto_satelite_desativado
 def cancel(sub_id: int):
     sub = CustomerSubscription.query.get_or_404(sub_id)
