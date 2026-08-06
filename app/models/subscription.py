@@ -1,8 +1,11 @@
 from datetime import date, datetime
 from app.extensions import db
+from app.models.tenant import TenantMixin
 
 
-class CustomerSubscription(db.Model):
+class CustomerSubscription(TenantMixin, db.Model):
+    """Por EMPRESA, não unidade (Fase 1-B) — segue Cliente, cujo histórico
+    já atravessa unidades da mesma empresa."""
     __tablename__ = "customer_subscription"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -89,7 +92,8 @@ class CustomerSubscription(db.Model):
         ]
 
 
-class SubscriptionCreditBalance(db.Model):
+class SubscriptionCreditBalance(TenantMixin, db.Model):
+    """Mesmo escopo do CustomerSubscription pai — empresa, não unidade."""
     __tablename__ = "subscription_credit_balance"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -108,15 +112,19 @@ class SubscriptionCreditBalance(db.Model):
         return max(0, self.total_credits - self.used_credits)
 
 
-class SubscriptionCreditUsage(db.Model):
+class SubscriptionCreditUsage(TenantMixin, db.Model):
+    """Mesmo escopo do CustomerSubscription pai — empresa, não unidade."""
     __tablename__ = "subscription_credit_usage"
 
     id = db.Column(db.Integer, primary_key=True)
     subscription_id = db.Column(
         db.Integer, db.ForeignKey("customer_subscription.id"), nullable=False
     )
+    # ondelete='SET NULL' (Fase 1-B, era NO ACTION) — preserva o histórico
+    # de uso de crédito mesmo se o Agendamento em si for apagado, em vez de
+    # depender só de refund_credit() já ter deletado este registro antes.
     appointment_id = db.Column(
-        db.Integer, db.ForeignKey("appointments.id"), nullable=True
+        db.Integer, db.ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True
     )
     service_id = db.Column(db.Integer, db.ForeignKey("services.id"), nullable=False)
     used_at = db.Column(db.DateTime, default=datetime.utcnow)

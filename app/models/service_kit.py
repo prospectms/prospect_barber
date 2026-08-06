@@ -1,7 +1,12 @@
 from app.extensions import db
+from app.models.tenant import TenantMixin, UnidadeMixin
 
 
-class ServiceKit(db.Model):
+class ServiceKit(TenantMixin, UnidadeMixin, db.Model):
+    """Por unidade (Fase 1-B): os itens do kit apontam pra Servico, que já
+    é por-unidade — duas unidades da mesma empresa têm linhas de Servico
+    diferentes pro "mesmo" corte, então um kit só faz sentido natural se
+    também for por unidade."""
     __tablename__ = "service_kit"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -51,7 +56,10 @@ class ServiceKit(db.Model):
         return f"<ServiceKit {self.name}>"
 
 
-class ServiceKitItem(db.Model):
+class ServiceKitItem(TenantMixin, UnidadeMixin, db.Model):
+    """Mesmo escopo do ServiceKit pai — empresa_id/unidade_id redundantes
+    com kit_id mas explícitos de propósito (mesma filosofia dos demais
+    models de tenant: nunca depender de join implícito pra isolamento)."""
     __tablename__ = "service_kit_item"
 
     id = db.Column(db.Integer, primary_key=True)

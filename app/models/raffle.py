@@ -1,8 +1,12 @@
 from app.extensions import db
 from datetime import datetime, timezone
+from app.models.tenant import TenantMixin
 
 
-class Raffle(db.Model):
+class Raffle(TenantMixin, db.Model):
+    """Por EMPRESA, não unidade (Fase 1-B) — o pool de sorteio já varria
+    Agendamento sem filtro de unidade desde antes desta fase, agregando
+    clientes de todas as unidades da empresa num sorteio só."""
     __tablename__ = "raffles"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -57,7 +61,8 @@ class Raffle(db.Model):
         return f"<Raffle {self.name!r} [{self.status}]>"
 
 
-class RaffleWinner(db.Model):
+class RaffleWinner(TenantMixin, db.Model):
+    """Mesmo escopo do Raffle pai — empresa, não unidade."""
     __tablename__ = "raffle_winners"
 
     id = db.Column(db.Integer, primary_key=True)

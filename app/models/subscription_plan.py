@@ -1,7 +1,13 @@
 from app.extensions import db
+from app.models.tenant import TenantMixin, UnidadeMixin
 
 
-class SubscriptionPlan(db.Model):
+class SubscriptionPlan(TenantMixin, UnidadeMixin, db.Model):
+    """Por unidade (Fase 1-B) — mesma razão do ServiceKit: os créditos
+    apontam pra Servico, que já é por-unidade. Não confundir com `Plano`
+    (app/models/plano.py), o tier de assinatura da PLATAFORMA — este aqui
+    é o clube de recorrência que a própria barbearia vende pros clientes
+    dela, conceito totalmente diferente."""
     __tablename__ = "subscription_plan"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -35,7 +41,8 @@ class SubscriptionPlan(db.Model):
         return f"<SubscriptionPlan {self.name}>"
 
 
-class SubscriptionPlanCredit(db.Model):
+class SubscriptionPlanCredit(TenantMixin, UnidadeMixin, db.Model):
+    """Mesmo escopo do SubscriptionPlan pai."""
     __tablename__ = "subscription_plan_credit"
 
     id = db.Column(db.Integer, primary_key=True)
