@@ -72,6 +72,7 @@ _TABLES = [
     "uso_mensal",
     "appointments", "barber_schedule_exception",
     "services", "barbers", "customers",
+    "asaas_webhook_events", "assinaturas",
     "users", "unidades", "empresas",
 ]
 
