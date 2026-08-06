@@ -36,6 +36,14 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"
     TIMEZONE = "America/Campo_Grande"
 
+    # Asaas (gateway de pagamento, Fase 3). ASAAS_WEBHOOK_TOKEN é o valor
+    # configurado manualmente no painel Asaas (Configurações > Webhooks) —
+    # comparado contra o header asaas-access-token em toda notificação
+    # recebida, nunca aceito sem essa validação.
+    ASAAS_API_BASE_URL = os.environ.get("ASAAS_API_BASE_URL", "https://api-sandbox.asaas.com/v3")
+    ASAAS_API_KEY = os.environ.get("ASAAS_API_KEY", "")
+    ASAAS_WEBHOOK_TOKEN = os.environ.get("ASAAS_WEBHOOK_TOKEN", "")
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
