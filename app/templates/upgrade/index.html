@@ -3,12 +3,17 @@
 {% block page_title %}Planos{% endblock %}
 
 {% block content %}
-<div class="mb-4 mt-2">
-  <h5 class="fw-bold mb-0">Escolha o plano da sua empresa</h5>
-  <p class="text-muted small mb-0">
-    Plano atual: <strong>{{ empresa.plano.nome|capitalize }}</strong>
-    {% if empresa.periodicidade %} · {{ empresa.periodicidade|capitalize }}{% endif %}
-  </p>
+<div class="mb-4 mt-2 d-flex justify-content-between align-items-start flex-wrap gap-2">
+  <div>
+    <h5 class="fw-bold mb-0">Escolha o plano da sua empresa</h5>
+    <p class="text-muted small mb-0">
+      Plano atual: <strong>{{ empresa.plano.nome|capitalize }}</strong>
+      {% if empresa.periodicidade %} · {{ empresa.periodicidade|capitalize }}{% endif %}
+    </p>
+  </div>
+  <a href="{{ url_for('upgrade.status') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-receipt me-1"></i>Status da assinatura
+  </a>
 </div>
 
 <div class="row g-4">
@@ -52,10 +57,10 @@
 
         {% if atual %}
         <button class="btn btn-outline-gold w-100" disabled>Plano atual</button>
+        {% elif plano.nome == "free" %}
+        <a href="{{ url_for('upgrade.status') }}" class="btn btn-outline-secondary w-100">Ver assinatura</a>
         {% else %}
-        <form method="POST" action="{{ url_for('upgrade.checkout', plano_id=plano.id) }}">
-          <button type="submit" class="btn btn-gold w-100 fw-bold">Assinar</button>
-        </form>
+        <a href="{{ url_for('upgrade.checkout', plano_id=plano.id) }}" class="btn btn-gold w-100 fw-bold">Assinar</a>
         {% endif %}
 
       </div>

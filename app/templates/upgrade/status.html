@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Assinatura{% endblock %}
+{% block page_title %}Status da assinatura{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-7 col-lg-8 col-md-10">
+
+    <div class="card card-dark mb-4">
+      <div class="card-header">
+        <h6 class="fw-bold mb-0"><i class="bi bi-receipt text-gold me-2"></i>Plano atual</h6>
+      </div>
+      <div class="card-body p-4">
+        <div class="fs-5 fw-bold text-gold">{{ empresa.plano.nome|capitalize }}</div>
+        <div class="text-muted small">Status espelhado: {{ empresa.status_assinatura }}</div>
+      </div>
+    </div>
+
+    {% if assinatura %}
+    <div class="card card-dark mb-4">
+      <div class="card-header">
+        <h6 class="fw-bold mb-0"><i class="bi bi-clock-history text-gold me-2"></i>Última assinatura</h6>
+      </div>
+      <div class="card-body p-4">
+        <ul class="list-unstyled small mb-0">
+          <li class="mb-2">
+            <strong>Status:</strong>
+            {% if assinatura.status == 'pendente' %}
+              <span class="badge badge-pending">Processando pagamento</span>
+            {% elif assinatura.status == 'ativa' %}
+              <span class="badge badge-confirmed">Ativa</span>
+            {% elif assinatura.status == 'inadimplente' %}
+              <span class="badge badge-no_show">Inadimplente</span>
+            {% else %}
+              <span class="badge badge-cancelled">{{ assinatura.status|capitalize }}</span>
+            {% endif %}
+          </li>
+          <li class="mb-2"><strong>Plano contratado:</strong> {{ assinatura.plano.nome|capitalize }}</li>
+          <li class="mb-2"><strong>Valor:</strong> R$ {{ "%.2f"|format(assinatura.valor)|replace(".", ",") }} ({{ assinatura.periodicidade }})</li>
+          <li class="mb-2"><strong>Forma de pagamento:</strong> {{ "Pix" if assinatura.forma_pagamento == "pix" else "Cartão de crédito" }}</li>
+          {% if assinatura.proximo_vencimento %}
+          <li class="mb-2"><strong>Vencimento:</strong> {{ assinatura.proximo_vencimento.strftime("%d/%m/%Y") }}</li>
+          {% endif %}
+        </ul>
+
+        {% if assinatura.status == 'pendente' %}
+        <div class="alert alert-info mt-3 mb-0 small">
+          Aguardando confirmação do pagamento pela operadora. Seu plano será liberado
+          automaticamente assim que o pagamento for confirmado — pode levar alguns
+          minutos. Atualize esta página pra ver o status mais recente.
+        </div>
+        {% elif assinatura.status == 'inadimplente' %}
+        <div class="alert alert-warning mt-3 mb-0 small">
+          Pagamento em atraso.
+          {% if dias_restantes is not none %}
+            {% if dias_restantes > 0 %}
+              Seu plano será rebaixado automaticamente para o Free em {{ dias_restantes }}
+              dia(s) caso o pagamento não seja regularizado.
+            {% else %}
+              Seu plano será rebaixado para o Free em breve caso o pagamento não seja regularizado.
+            {% endif %}
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="text-center py-4 text-muted">
+      <i class="bi bi-receipt d-block fs-3 mb-2 opacity-25"></i>
+      <div class="small">Nenhuma assinatura contratada ainda.</div>
+    </div>
+    {% endif %}
+
+    <a href="{{ url_for('upgrade.index') }}" class="btn btn-outline-secondary">Ver planos</a>
+
+  </div>
+</div>
+{% endblock %}

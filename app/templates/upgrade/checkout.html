@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Assinar {{ plano.nome|capitalize }}{% endblock %}
+{% block page_title %}Assinar plano {{ plano.nome|capitalize }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-7 col-lg-8 col-md-10">
+
+    <nav class="mb-3" aria-label="breadcrumb">
+      <ol class="breadcrumb small">
+        <li class="breadcrumb-item"><a href="{{ url_for('upgrade.index') }}" class="text-gold">Planos</a></li>
+        <li class="breadcrumb-item active">Assinar {{ plano.nome|capitalize }}</li>
+      </ol>
+    </nav>
+
+    <form method="POST" novalidate id="checkoutForm">
+      {{ form.csrf_token }}
+
+      <div class="card card-dark mb-4">
+        <div class="card-header">
+          <h6 class="fw-bold mb-0"><i class="bi bi-credit-card text-gold me-2"></i>Dados da assinatura</h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+
+            <div class="col-12">
+              <label class="form-label fw-semibold small">Periodicidade</label>
+              <div class="d-flex gap-3">
+                <div class="form-check">
+                  {{ form.periodicidade(class="form-check-input", value="mensal", id="per_mensal") }}
+                  <label class="form-check-label" for="per_mensal">Mensal — {{ plano.preco_mensal_formatado }}/mês</label>
+                </div>
+                <div class="form-check">
+                  {{ form.periodicidade(class="form-check-input", value="anual", id="per_anual") }}
+                  <label class="form-check-label" for="per_anual">Anual — {{ plano.preco_anual_formatado }}/ano</label>
+                </div>
+              </div>
+              {% for erro in form.periodicidade.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold small">Forma de pagamento</label>
+              <div class="d-flex gap-3">
+                <div class="form-check">
+                  {{ form.forma_pagamento(class="form-check-input forma-pagamento-radio", value="pix", id="fp_pix") }}
+                  <label class="form-check-label" for="fp_pix">Pix</label>
+                </div>
+                <div class="form-check">
+                  {{ form.forma_pagamento(class="form-check-input forma-pagamento-radio", value="cartao", id="fp_cartao") }}
+                  <label class="form-check-label" for="fp_cartao">Cartão de crédito</label>
+                </div>
+              </div>
+              {% for erro in form.forma_pagamento.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">CNPJ/CPF da empresa</label>
+              {{ form.documento(class="form-control bg-dark border-secondary text-light") }}
+              {% for erro in form.documento.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">E-mail de cobrança</label>
+              {{ form.email(class="form-control bg-dark border-secondary text-light") }}
+              {% for erro in form.email.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Telefone</label>
+              {{ form.telefone(class="form-control bg-dark border-secondary text-light") }}
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-dark mb-4" id="cardFieldsCard" style="display:none">
+        <div class="card-header">
+          <h6 class="fw-bold mb-0"><i class="bi bi-credit-card-2-front text-gold me-2"></i>Dados do cartão</h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label fw-semibold small">Nome impresso no cartão</label>
+              {{ form.card_holder_name(class="form-control bg-dark border-secondary text-light") }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">Número do cartão</label>
+              {{ form.card_number(class="form-control bg-dark border-secondary text-light", autocomplete="cc-number") }}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small">Mês</label>
+              {{ form.card_expiry_month(class="form-control bg-dark border-secondary text-light", placeholder="MM") }}
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small">Ano</label>
+              {{ form.card_expiry_year(class="form-control bg-dark border-secondary text-light", placeholder="AAAA") }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">CVV</label>
+              {{ form.card_ccv(class="form-control bg-dark border-secondary text-light") }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">CEP do titular</label>
+              {{ form.card_postal_code(class="form-control bg-dark border-secondary text-light") }}
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">Número do endereço</label>
+              {{ form.card_address_number(class="form-control bg-dark border-secondary text-light") }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-gold px-4 fw-bold">
+          <i class="bi bi-lock-fill me-2"></i>Confirmar assinatura
+        </button>
+        <a href="{{ url_for('upgrade.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const cardCard = document.getElementById('cardFieldsCard');
+const radios = document.querySelectorAll('.forma-pagamento-radio');
+function toggleCardFields() {
+  const selecionado = document.querySelector('.forma-pagamento-radio:checked');
+  cardCard.style.display = (selecionado && selecionado.value === 'cartao') ? 'block' : 'none';
+}
+radios.forEach(r => r.addEventListener('change', toggleCardFields));
+toggleCardFields();
+</script>
+{% endblock %}

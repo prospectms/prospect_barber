@@ -28,6 +28,9 @@ def create_app(config_name: str = "default") -> Flask:
     # _ensure_schema(app) — CONGELADO na Fase 1-A. Ver docstring da função:
     # substituído por Flask-Migrate/Alembic (comando `flask db upgrade`).
 
+    from app.billing.scheduler import init_scheduler
+    init_scheduler(app)
+
     return app
 
 
@@ -69,6 +72,7 @@ def _register_blueprints(app: Flask) -> None:
     from app.superadmin.routes import superadmin_bp
     from app.unidades.routes import unidades_bp
     from app.upgrade.routes import upgrade_bp
+    from app.webhooks.routes import webhooks_bp
 
     app.register_blueprint(auth_bp,           url_prefix="/auth")
     app.register_blueprint(dashboard_bp,      url_prefix="/")
@@ -85,6 +89,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(superadmin_bp,     url_prefix="/superadmin")
     app.register_blueprint(unidades_bp,       url_prefix="/unidades")
     app.register_blueprint(upgrade_bp,        url_prefix="/upgrade")
+    app.register_blueprint(webhooks_bp,       url_prefix="/webhooks")
 
 
 def _configure_login_manager() -> None:
