@@ -144,7 +144,7 @@ def lookup(slug: str):
             appointments = _load_appointments(customer, date_from, date_to)
             if SATELLITE_FEATURES_ENABLED:
                 from app.subscriptions.service import get_active_subscription
-                subscription = get_active_subscription(customer.id)
+                subscription = get_active_subscription(unidade.empresa_id, customer.id)
 
     return render_template(
         "client/lookup.html",
@@ -197,7 +197,7 @@ def cancel_appointment(slug: str, appt_id: int):
     else:
         if SATELLITE_FEATURES_ENABLED:
             from app.subscriptions.service import refund_credit
-            refund_credit(appt.id)
+            refund_credit(unidade.empresa_id, appt.id)
         appt.status = "cancelled"
         db.session.commit()
         flash("Agendamento cancelado.", "info")
@@ -275,7 +275,7 @@ def reschedule_appointment(slug: str, appt_id: int):
         had_credits = False
         if SATELLITE_FEATURES_ENABLED:
             from app.subscriptions.service import refund_credit
-            had_credits = refund_credit(appt.id)
+            had_credits = refund_credit(unidade.empresa_id, appt.id)
 
         appt.status = "cancelled"
         new_appt = Agendamento(
@@ -295,7 +295,7 @@ def reschedule_appointment(slug: str, appt_id: int):
 
         if had_credits and SATELLITE_FEATURES_ENABLED:
             from app.subscriptions.service import consume_credit
-            consume_credit(appt.customer_id, appt.service_id, new_appt.id)
+            consume_credit(unidade.empresa_id, appt.customer_id, appt.service_id, new_appt.id)
 
         db.session.commit()
         flash("Agendamento remarcado com sucesso!", "success")

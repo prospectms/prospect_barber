@@ -164,7 +164,7 @@ def new():
         if SATELLITE_FEATURES_ENABLED:
             db.session.flush()
             from app.subscriptions.service import consume_credit
-            consume_credit(form.customer_id.data, service_id, appt.id)
+            consume_credit(g.empresa_id, form.customer_id.data, service_id, appt.id)
 
         db.session.commit()
         flash("Agendamento criado com sucesso!", "success")
@@ -199,7 +199,7 @@ def update_status(appt_id: int):
 
     if new_status == "cancelled" and old_status != "cancelled" and SATELLITE_FEATURES_ENABLED:
         from app.subscriptions.service import refund_credit
-        refund_credit(appt.id)
+        refund_credit(g.empresa_id, appt.id)
 
     db.session.commit()
     flash(f"Status atualizado para '{APPOINTMENT_STATUSES[new_status]}'.", "success")
@@ -217,7 +217,7 @@ def delete(appt_id: int):
 
     if SATELLITE_FEATURES_ENABLED:
         from app.subscriptions.service import refund_credit
-        refund_credit(appt.id)
+        refund_credit(g.empresa_id, appt.id)
 
     db.session.delete(appt)
     db.session.commit()

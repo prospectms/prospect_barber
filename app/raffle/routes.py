@@ -1,7 +1,7 @@
 import random
 from datetime import date, datetime, timezone
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, render_template, redirect, url_for, flash, request, g
 from flask_login import login_required
 from sqlalchemy import func, distinct
 
@@ -10,19 +10,24 @@ from app.models.raffle import Raffle, RaffleWinner
 from app.models.cliente import Cliente
 from app.models.agendamento import Agendamento
 from app.utils.decorators import requer_papel
+from app.utils.limites import requer_modulo
 from app.utils.feature_flags import bloqueado_enquanto_satelite_desativado
 
 raffle_bp = Blueprint("raffle", __name__)
 
-# Bloqueado por completo na Fase 1-A (ver app/utils/feature_flags.py) — Raffle/
-# RaffleWinner ainda não têm empresa_id/unidade_id, então nenhuma consulta
-# aqui está isolada por tenant. A lógica abaixo fica pronta para a Fase 1-B
-# reativar (só remover o decorator e escopar as queries), mas não roda hoje.
+# Fase 1-B: Raffle/RaffleWinner já têm empresa_id (TenantMixin) — as
+# consultas de listagem/detalhe saem escopadas pelo filtro ambiente (mesmo
+# padrão de barbers/customers/services), incluindo o pool do sorteio (que
+# junta Agendamento/Cliente, ambos TenantMixin também). As duas criações
+# (Raffle em new(), RaffleWinner em draw()) passam empresa_id explícito —
+# coluna obrigatória agora. @bloqueado_enquanto_satelite_desativado
+# continua de pé até os testes de isolamento passarem.
 
 
 @raffle_bp.route("/")
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("sorteios")
 @bloqueado_enquanto_satelite_desativado
 def index():
     raffles = Raffle.query.order_by(Raffle.created_at.desc()).all()
@@ -32,6 +37,7 @@ def index():
 @raffle_bp.route("/new", methods=["GET", "POST"])
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("sorteios")
 @bloqueado_enquanto_satelite_desativado
 def new():
     errors = {}
@@ -74,6 +80,7 @@ def new():
 
         if not errors:
             raffle = Raffle(
+                empresa_id=g.empresa_id,
                 name=form_data["name"],
                 prize=form_data["prize"] or None,
                 description=form_data["description"] or None,
@@ -92,6 +99,7 @@ def new():
 @raffle_bp.route("/<int:raffle_id>")
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("sorteios")
 @bloqueado_enquanto_satelite_desativado
 def detail(raffle_id: int):
     raffle = Raffle.query.get_or_404(raffle_id)
@@ -143,6 +151,7 @@ def detail(raffle_id: int):
 @raffle_bp.route("/<int:raffle_id>/draw", methods=["POST"])
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("sorteios")
 @bloqueado_enquanto_satelite_desativado
 def draw(raffle_id: int):
     raffle = Raffle.query.get_or_404(raffle_id)
@@ -184,6 +193,7 @@ def draw(raffle_id: int):
     for position, customer in enumerate(chosen, start=1):
         db.session.add(
             RaffleWinner(
+                empresa_id=g.empresa_id,
                 raffle_id=raffle.id,
                 customer_id=customer.id,
                 position=position,
@@ -208,6 +218,7 @@ def draw(raffle_id: int):
 @raffle_bp.route("/<int:raffle_id>/delete", methods=["POST"])
 @login_required
 @requer_papel("dono", "gerente")
+@requer_modulo("sorteios")
 @bloqueado_enquanto_satelite_desativado
 def delete(raffle_id: int):
     raffle = Raffle.query.get_or_404(raffle_id)

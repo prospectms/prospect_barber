@@ -1,5 +1,5 @@
 from datetime import date, datetime, timedelta
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, g
 from flask_login import login_required
 from app.extensions import db
 from app.models.subscription_plan import SubscriptionPlan
@@ -14,10 +14,16 @@ from app.subscriptions.service import get_active_subscription, check_credit, che
 
 subscriptions_bp = Blueprint("subscriptions", __name__)
 
-# Bloqueado por completo na Fase 1-A (ver app/utils/feature_flags.py) — os
-# models de assinatura ainda não têm empresa_id/unidade_id, então nenhuma
-# consulta aqui está isolada por tenant. Fica pronto para a Fase 1-B
-# reativar (remover o decorator e escopar as queries), mas não roda hoje.
+# Fase 1-B: CustomerSubscription/SubscriptionCreditBalance/
+# SubscriptionCreditUsage já têm empresa_id (TenantMixin) — as queries
+# abaixo saem escopadas automaticamente pelo filtro ambiente (mesmo padrão
+# de barbers/customers/services), e a criação de linha passa empresa_id
+# explícito (coluna obrigatória agora). As chamadas às 6 funções de
+# app/subscriptions/service.py passam g.empresa_id explícito porque essas
+# funções, por decisão da Fase 1-B, nunca confiam no filtro ambiente
+# internamente (podem ser chamadas fora de um request normal no futuro).
+# @bloqueado_enquanto_satelite_desativado continua de pé — só sai quando os
+# testes de isolamento destes 9 models passarem.
 
 _VALIDITY_OPTIONS = [
     ("30",  "30 dias"),
@@ -147,11 +153,12 @@ def new():
 
         end = _resolve_end_date(start)
 
-        existing = get_active_subscription(customer_id)
+        existing = get_active_subscription(g.empresa_id, customer_id)
         if existing:
             existing.status = "cancelled"
 
         sub = CustomerSubscription(
+            empresa_id=g.empresa_id,
             customer_id=customer_id,
             plan_id=plan_id,
             start_date=start,
@@ -162,6 +169,7 @@ def new():
 
         for plan_credit in plan.credits:
             db.session.add(SubscriptionCreditBalance(
+                empresa_id=g.empresa_id,
                 subscription_id=sub.id,
                 service_id=plan_credit.service_id,
                 total_credits=plan_credit.quantity,
@@ -224,6 +232,7 @@ def renew(sub_id: int):
             balance.total_credits += plan_credit.quantity
         else:
             db.session.add(SubscriptionCreditBalance(
+                empresa_id=g.empresa_id,
                 subscription_id=sub.id,
                 service_id=plan_credit.service_id,
                 total_credits=plan_credit.quantity,
@@ -266,7 +275,7 @@ def credit_check():
     if not customer_id:
         return jsonify({"has_credit": False})
     if kit_id:
-        return jsonify(check_credit_kit(customer_id, kit_id))
+        return jsonify(check_credit_kit(g.empresa_id, customer_id, kit_id))
     if service_id:
-        return jsonify(check_credit(customer_id, service_id))
+        return jsonify(check_credit(g.empresa_id, customer_id, service_id))
     return jsonify({"has_credit": False})
