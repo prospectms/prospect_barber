@@ -119,10 +119,10 @@ def _seed_planos(db) -> dict:
          "preco_mensal": 49.99, "preco_anual": 569.89, "modulos_incluidos": []},
         {"nome": "pro", "max_unidades": 5, "max_usuarios": None, "max_servicos": None,
          "preco_mensal": 79.99, "preco_anual": 883.09,
-         "modulos_incluidos": ["relatorios", "clube_recorrencia"]},
+         "modulos_incluidos": ["relatorios", "clube_recorrencia", "sorteios"]},
         {"nome": "ilimitado", "max_unidades": None, "max_usuarios": None, "max_servicos": None,
          "preco_mensal": 199.99, "preco_anual": 2159.89,
-         "modulos_incluidos": ["relatorios", "clube_recorrencia"]},
+         "modulos_incluidos": ["relatorios", "clube_recorrencia", "sorteios"]},
     ]
     ids = {}
     for d in dados:
