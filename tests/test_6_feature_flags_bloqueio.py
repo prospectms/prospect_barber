@@ -1,10 +1,30 @@
-"""Categoria 6 — raffle/subscriptions continuam bloqueados mesmo com
-acesso direto por URL (não só escondidos do menu)."""
+"""Categoria 6 — mecanismo de bloqueio de raffle/subscriptions (kill
+switch) continua funcionando mesmo depois da Fase 1-B ter ligado
+SATELLITE_FEATURES_ENABLED=True por padrão.
+
+Desde a Fase 1-B a flag real é True (os 9 models satélite já são
+seguros de usar, ver app/utils/feature_flags.py) — os testes abaixo
+NÃO testam mais o estado padrão do app, testam que o mecanismo de
+emergência (voltar a flag pra False, ex.: bug descoberto em produção)
+continua bloqueando de verdade se algum dia for preciso. `flag_desligada`
+monkeypatcha os 5 bindings pra False só durante o teste (mesma técnica
+de `satelite_ligado` em test_8_isolamento_satelite.py, invertida)."""
 import pytest
 
 
 @pytest.fixture
-def logado(client, login, empresa_a):
+def flag_desligada(monkeypatch):
+    import app.utils.feature_flags as ff
+    import app.booking.routes as booking_routes
+    import app.appointments.routes as appt_routes
+    import app.client.routes as client_routes
+    import app.subscriptions.routes as sub_routes
+    for mod in (ff, booking_routes, appt_routes, client_routes, sub_routes):
+        monkeypatch.setattr(mod, "SATELLITE_FEATURES_ENABLED", False)
+
+
+@pytest.fixture
+def logado(client, login, empresa_a, flag_desligada):
     login(empresa_a["dono_email"], empresa_a["senha"])
     client.post("/auth/unidade", data={"unidade_id": empresa_a["unidade_id"]}, follow_redirects=True)
     return empresa_a
