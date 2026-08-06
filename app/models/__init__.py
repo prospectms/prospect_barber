@@ -15,6 +15,7 @@ from .service_kit import ServiceKit, ServiceKitItem
 from .subscription_plan import SubscriptionPlan, SubscriptionPlanCredit
 from .subscription import CustomerSubscription, SubscriptionCreditBalance, SubscriptionCreditUsage
 from .barber_schedule_exception import BarberScheduleException
+from .assinatura import Assinatura, AsaasWebhookEvent
 
 __all__ = [
     "TenantMixin",

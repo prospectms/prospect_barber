@@ -24,6 +24,11 @@ class Empresa(db.Model):
     # "placeholder simples" documentado no próprio comentário anterior.
     # default=1 == plano "free", garantido pela ordem de seed da migração.
     plano_id = db.Column(db.Integer, db.ForeignKey("planos.id"), nullable=False, default=1)
+    # Fase 3: campo ESPELHADO, não é mais fonte de verdade — Assinatura.status
+    # (app/models/assinatura.py) é quem manda. Toda escrita em Assinatura.status
+    # atualiza este campo na mesma transação, só pros templates de superadmin
+    # existentes (que já leem isso) não quebrarem. Nenhuma lógica de negócio
+    # nova deve ler este campo diretamente — leia Assinatura.status.
     status_assinatura = db.Column(db.String(20), nullable=False, default="ativa")
 
     # periodicidade/preco_congelado só fazem sentido depois que a empresa
