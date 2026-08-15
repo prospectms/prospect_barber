@@ -288,6 +288,55 @@ def test_iniciar_checkout_nao_libera_plano_antes_da_confirmacao(app, db, planos,
         assert empresa.status_assinatura == "pendente"
 
 
+def test_iniciar_checkout_captura_invoice_url_da_primeira_cobranca(app, db, planos, monkeypatch):
+    """Achado do smoke test contra o sandbox real (2026-08-12): a resposta
+    de criação da assinatura não traz link de pagamento nenhum -- só o
+    invoiceUrl da primeira cobrança (GET /v3/payments?subscription=<id>)
+    dá pro cliente um jeito real de pagar. Sem capturar isso, a tela de
+    status não tem o que mostrar no botão "Pagar agora"."""
+    monkeypatch.setattr(billing_service.asaas_client, "create_customer", lambda **kwargs: {"id": "cus_inv_1"})
+    monkeypatch.setattr(billing_service.asaas_client, "create_subscription_pix", lambda **kwargs: {"id": "sub_inv_1"})
+    monkeypatch.setattr(
+        billing_service.asaas_client, "get_first_payment_invoice_url",
+        lambda subscription_id: f"https://sandbox.asaas.com/i/fake-{subscription_id}",
+    )
+
+    with app.app_context():
+        empresa_id = _criar_empresa(db, planos["free"])
+        empresa = Empresa.query.get(empresa_id)
+        plano_pro = Plano.query.filter_by(nome="pro").first()
+
+        assinatura = billing_service.iniciar_checkout(
+            empresa=empresa, plano=plano_pro, periodicidade="mensal", forma_pagamento="pix",
+            documento="11144477735", email="dono@fase3.example.com", telefone=None, remote_ip="127.0.0.1",
+        )
+        assert assinatura.invoice_url == "https://sandbox.asaas.com/i/fake-sub_inv_1"
+
+
+def test_iniciar_checkout_sobrevive_falha_ao_buscar_invoice_url(app, db, planos, monkeypatch):
+    """get_first_payment_invoice_url falhando não pode derrubar o checkout
+    inteiro -- a Assinatura já existe de verdade na Asaas nesse ponto, só
+    o botão "Pagar agora" fica ausente na tela de status."""
+    monkeypatch.setattr(billing_service.asaas_client, "create_customer", lambda **kwargs: {"id": "cus_inv_2"})
+    monkeypatch.setattr(billing_service.asaas_client, "create_subscription_pix", lambda **kwargs: {"id": "sub_inv_2"})
+
+    def _falha(subscription_id):
+        raise billing_service.asaas_client.AsaasError("timeout simulado")
+    monkeypatch.setattr(billing_service.asaas_client, "get_first_payment_invoice_url", _falha)
+
+    with app.app_context():
+        empresa_id = _criar_empresa(db, planos["free"])
+        empresa = Empresa.query.get(empresa_id)
+        plano_pro = Plano.query.filter_by(nome="pro").first()
+
+        assinatura = billing_service.iniciar_checkout(
+            empresa=empresa, plano=plano_pro, periodicidade="mensal", forma_pagamento="pix",
+            documento="11144477735", email="dono@fase3.example.com", telefone=None, remote_ip="127.0.0.1",
+        )
+        assert assinatura.status == "pendente"  # checkout completou normalmente
+        assert assinatura.invoice_url is None
+
+
 def test_iniciar_checkout_reaproveita_cliente_asaas_existente(app, db, planos, monkeypatch):
     chamadas_create_customer = []
     monkeypatch.setattr(
@@ -351,6 +400,23 @@ def test_checkout_get_plano_free_redireciona_pro_index(client, login_dono_a, pla
     assert "não precisa de pagamento" in r.text.lower()
 
 
+def test_checkout_post_telefone_malformado_rejeitado_sem_chamar_asaas(client, login_dono_a, planos, monkeypatch):
+    chamado = []
+    monkeypatch.setattr(billing_service.asaas_client, "create_customer", lambda **kwargs: chamado.append(1) or {"id": "cus_x"})
+
+    r = client.post(
+        f"/upgrade/checkout/{planos['pro']}",
+        data={
+            "periodicidade": "mensal", "forma_pagamento": "pix",
+            "documento": "11144477735", "email": "dono@empresa-a.example.com",
+            "telefone": "123",  # curto demais, formato invalido
+        },
+    )
+    assert r.status_code == 200  # re-renderiza o form, não redireciona
+    assert "telefone inválido" in r.text.lower()
+    assert chamado == []  # nem chegou a chamar a Asaas
+
+
 def test_status_page_sem_assinatura(client, login_dono_a):
     r = client.get("/upgrade/status")
     assert r.status_code == 200
@@ -363,6 +429,10 @@ def test_checkout_post_pix_cria_assinatura_pendente_e_redireciona_pro_status(app
     verificação de "sem assinatura ainda" precisa vir antes dela."""
     monkeypatch.setattr(billing_service.asaas_client, "create_customer", lambda **kwargs: {"id": "cus_http_1"})
     monkeypatch.setattr(billing_service.asaas_client, "create_subscription_pix", lambda **kwargs: {"id": "sub_http_1"})
+    monkeypatch.setattr(
+        billing_service.asaas_client, "get_first_payment_invoice_url",
+        lambda subscription_id: "https://sandbox.asaas.com/i/fake-http-1",
+    )
 
     r = client.post(
         f"/upgrade/checkout/{planos['pro']}",
@@ -374,9 +444,12 @@ def test_checkout_post_pix_cria_assinatura_pendente_e_redireciona_pro_status(app
     )
     assert r.status_code == 200
     assert "/upgrade/status" in r.request.path
+    assert "https://sandbox.asaas.com/i/fake-http-1" in r.text
+    assert "pagar agora" in r.text.lower()
 
     with app.app_context():
         assinatura = Assinatura.query.filter_by(asaas_subscription_id="sub_http_1").first()
         assert assinatura is not None
+        assert assinatura.invoice_url == "https://sandbox.asaas.com/i/fake-http-1"
         assert assinatura.status == "pendente"
         assert assinatura.empresa_id == login_dono_a["empresa_id"]

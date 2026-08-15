@@ -66,6 +66,7 @@
             <div class="col-md-6">
               <label class="form-label fw-semibold small">Telefone</label>
               {{ form.telefone(class="form-control bg-dark border-secondary text-light") }}
+              {% for erro in form.telefone.errors %}<div class="text-danger small">{{ erro }}</div>{% endfor %}
             </div>
 
           </div>

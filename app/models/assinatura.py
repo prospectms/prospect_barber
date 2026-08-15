@@ -42,6 +42,14 @@ class Assinatura(TenantMixin, db.Model):
     inadimplente_desde = db.Column(db.DateTime, nullable=True)
     proximo_vencimento = db.Column(db.Date, nullable=True)
 
+    # invoiceUrl da primeira cobrança gerada junto com a assinatura (ver
+    # asaas_client.get_first_payment_invoice_url) -- é o único link real
+    # de pagamento (Pix/Boleto) que a Asaas devolve; a resposta de criação
+    # da assinatura em si não traz QR code/link nenhum. Sem isso o dono
+    # não tem como pagar pela nossa própria UI. Capturado uma vez em
+    # iniciar_checkout(), não é atualizado a cada ciclo de renovação.
+    invoice_url = db.Column(db.String(255), nullable=True)
+
     criado_em = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     atualizado_em = db.Column(
         db.DateTime,

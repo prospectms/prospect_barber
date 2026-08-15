@@ -105,6 +105,15 @@ def iniciar_checkout(
             description=descricao, external_reference=str(empresa.id),
         )
 
+    try:
+        invoice_url = asaas_client.get_first_payment_invoice_url(resposta["id"])
+    except asaas_client.AsaasError:
+        # Não derruba o checkout por isso -- a Assinatura já foi criada de
+        # verdade na Asaas. Só o botão "Pagar agora" fica ausente na tela
+        # de status; o dono ainda pode achar a fatura pelo painel Asaas ou
+        # pelo e-mail que a Asaas manda automaticamente.
+        invoice_url = None
+
     assinatura = Assinatura(
         empresa_id=empresa.id,
         asaas_customer_id=asaas_customer_id,
@@ -115,6 +124,7 @@ def iniciar_checkout(
         periodicidade=periodicidade,
         forma_pagamento=forma_pagamento,
         proximo_vencimento=date.today(),
+        invoice_url=invoice_url,
     )
     db.session.add(assinatura)
     sincronizar_status_empresa(assinatura)

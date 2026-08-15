@@ -6,7 +6,7 @@ create-subscription-with-credit-card. Nenhuma lógica de negócio aqui (isso
 fica em app/upgrade/routes.py e no handler de webhook) — só monta o
 request, autentica e traduz erro HTTP em AsaasError.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import requests
 from flask import current_app
@@ -67,6 +67,20 @@ def _request(method: str, path: str, json_body: dict) -> dict:
     return data
 
 
+def _get(path: str, params: dict) -> dict:
+    base_url = current_app.config["ASAAS_API_BASE_URL"]
+    try:
+        resp = requests.get(f"{base_url}{path}", params=params, headers=_headers(), timeout=15)
+    except requests.RequestException as exc:
+        raise AsaasError(f"falha de rede ao chamar Asaas: {exc}") from exc
+
+    data = resp.json() if resp.content else {}
+    if resp.status_code >= 400:
+        erro = (data.get("errors") or [{}])[0].get("description", resp.text)
+        raise AsaasError(f"Asaas retornou {resp.status_code}: {erro}", status_code=resp.status_code, payload=data)
+    return data
+
+
 def create_customer(*, name: str, cpf_cnpj: str, email: str, mobile_phone: str | None = None,
                      external_reference: str | None = None) -> dict:
     """POST /v3/customers — retorna o dict de resposta (id em data['id'], ex. 'cus_000000001')."""
@@ -94,6 +108,26 @@ def create_subscription_pix(*, customer_id: str, value: float, cycle: str, next_
     if external_reference:
         body["externalReference"] = external_reference
     return _request("POST", "/subscriptions", body)
+
+
+def get_first_payment_invoice_url(subscription_id: str) -> str | None:
+    """GET /v3/payments?subscription=<id> — link real de pagamento
+    (invoiceUrl, mostra Pix/Boleto conforme o billingType) da primeira
+    cobrança gerada junto com a assinatura. A resposta de criação da
+    assinatura em si NUNCA traz QR code/link nenhum -- confirmado contra o
+    sandbox real (smoke test Fase 3, 2026-08-12); sem isso o cliente não
+    tem como pagar.
+
+    Só é chamada uma vez, logo após criar a assinatura (iniciar_checkout),
+    quando existe exatamente 1 cobrança pra essa assinatura -- por isso
+    pega data[0] sem se preocupar em ordenar. Retorna None se a Asaas
+    ainda não tiver gerado nenhuma cobrança (não deveria acontecer -- a
+    primeira cobrança é criada no mesmo request que cria a assinatura)."""
+    data = _get("/payments", {"subscription": subscription_id, "limit": 1})
+    pagamentos = data.get("data") or []
+    if not pagamentos:
+        return None
+    return pagamentos[0].get("invoiceUrl")
 
 
 def create_subscription_credit_card(*, customer_id: str, value: float, cycle: str, next_due_date: str,

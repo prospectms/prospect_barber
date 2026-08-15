@@ -1,6 +1,17 @@
+import re
+
 from flask_wtf import FlaskForm
 from wtforms import RadioField, StringField
-from wtforms.validators import DataRequired, Email, Length, Optional
+from wtforms.validators import DataRequired, Email, Length, Optional, ValidationError
+
+# 10 digitos (DDD + fixo) ou 11 (DDD + celular com o 9 na frente), só
+# dígitos após remover formatação. Não tenta replicar a checagem de
+# "número plausível" que a própria Asaas faz do lado dela (ex.: rejeitou
+# "11999999999", dígito repetido, no smoke test contra o sandbox real de
+# 2026-08-12, mesmo sendo um formato válido) -- isso é responsabilidade
+# dela, o formulário só barra o que é estruturalmente malformado antes de
+# gastar uma chamada de API.
+_TELEFONE_RE = re.compile(r"^\d{10,11}$")
 
 
 class CheckoutForm(FlaskForm):
@@ -27,6 +38,14 @@ class CheckoutForm(FlaskForm):
         validators=[DataRequired(message="E-mail é obrigatório."), Email(message="E-mail inválido."), Length(max=120)],
     )
     telefone = StringField("Telefone", validators=[Optional(), Length(max=20)])
+
+    def validate_telefone(self, field):
+        if not field.data:
+            return
+        digitos = re.sub(r"\D", "", field.data)
+        if not _TELEFONE_RE.match(digitos):
+            raise ValidationError("Telefone inválido. Use DDD + número, só dígitos (ex.: 11987654321).")
+        field.data = digitos
 
     # Campos exigidos só quando forma_pagamento == 'cartao' -- validados
     # manualmente na rota (DataRequired incondicional bloquearia o Pix).
