@@ -117,14 +117,15 @@ sudo chown barberhub:barberhub /var/www/barberhub/.env
 ```bash
 cd /var/www/barberhub
 
-# Criar tabelas
-sudo -u barberhub FLASK_CONFIG=production venv/bin/flask --app wsgi init-db
-
-# (Opcional) Popular com dados iniciais de exemplo
-sudo -u barberhub FLASK_CONFIG=production venv/bin/flask --app wsgi seed
+# Aplica todas as migrações Alembic (cria o schema do zero em um banco novo,
+# ou traz um banco existente até a revisão mais recente — idempotente)
+sudo -u barberhub FLASK_CONFIG=production venv/bin/flask --app wsgi db upgrade
 ```
 
-> **Importante:** após o seed, acesse o sistema e **mude as senhas** do admin e dos barbeiros de exemplo imediatamente.
+> Não há mais comando de seed automático (era da era pré-multi-tenant). O
+> primeiro acesso é pela tela de cadastro de empresa (`/auth/signup` ou
+> equivalente) — crie o usuário dono real ali, não há admin/senha padrão
+> pra trocar.
 
 ---
 
@@ -266,7 +267,7 @@ sudo -u barberhub venv/bin/pip install psycopg2-binary
 # DATABASE_URL=postgresql://barberhub:senha_forte@localhost:5432/barberhub
 
 # 6. Recriar tabelas no PostgreSQL
-sudo -u barberhub FLASK_CONFIG=production venv/bin/flask --app wsgi init-db
+sudo -u barberhub FLASK_CONFIG=production venv/bin/flask --app wsgi db upgrade
 
 # 7. (Opcional) Migrar dados do SQLite
 #    Use a ferramenta pgloader ou exporte/importe manualmente
@@ -313,7 +314,7 @@ sudo systemctl restart barberhub
 ## Checklist de go-live
 
 - [ ] `SECRET_KEY` gerada e salva no `.env`
-- [ ] Senhas padrão (`admin123`, `barber123`) alteradas
+- [ ] Cadastro da primeira empresa/dono feito pela tela de signup (sem seed/senha padrão)
 - [ ] SSL instalado e redirecionamento HTTP → HTTPS ativo
 - [ ] `sudo systemctl status barberhub` → `active (running)`
 - [ ] `sudo nginx -t` → `syntax is ok`

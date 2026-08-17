@@ -18,8 +18,8 @@ git pull --ff-only
 echo "==> [3/5] Instalando/atualizando dependências..."
 "$VENV/pip" install -r requirements.txt --quiet --no-cache-dir
 
-echo "==> [4/5] Aplicando migrações de banco (init-db é idempotente)..."
-FLASK_CONFIG=production "$VENV/flask" --app wsgi init-db
+echo "==> [4/5] Aplicando migrações de banco (Alembic, idempotente)..."
+FLASK_CONFIG=production "$VENV/flask" --app wsgi db upgrade
 
 echo "==> [5/5] Recarregando serviço (graceful reload)..."
 sudo systemctl reload "$SERVICE"
