@@ -31,4 +31,8 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_column('assinaturas', 'invoice_url')
+    # batch_alter_table: DROP COLUMN só é nativo em SQLite >= 3.35 --
+    # não vale depender da versão do sqlite3 do ambiente. Transparente no
+    # Postgres (roda como ALTER TABLE direto, sem recriar nada).
+    with op.batch_alter_table('assinaturas') as batch_op:
+        batch_op.drop_column('invoice_url')

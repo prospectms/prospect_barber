@@ -71,80 +71,83 @@ def upgrade():
 
     # ════════════════════════════════════════════════════════════════
     # 2. Backfill via derivação real (join)
+    #
+    # Subquery correlata (SET col = (SELECT ... WHERE ...)) em vez de
+    # UPDATE...FROM ou SELECT DISTINCT ON (ambos Postgres-only) -- SQLite
+    # não suporta nenhum dos dois. ORDER BY + LIMIT 1 substitui DISTINCT ON
+    # pra achar "o primeiro item" de forma portável entre os dois bancos.
     # ════════════════════════════════════════════════════════════════
 
     # service_kit_item <- services (via service_id)
     conn.execute(sa.text("""
-        UPDATE service_kit_item ski
-        SET empresa_id = s.empresa_id, unidade_id = s.unidade_id
-        FROM services s
-        WHERE ski.service_id = s.id
+        UPDATE service_kit_item
+        SET empresa_id = (SELECT s.empresa_id FROM services s WHERE s.id = service_kit_item.service_id),
+            unidade_id = (SELECT s.unidade_id FROM services s WHERE s.id = service_kit_item.service_id)
     """))
 
     # subscription_plan_credit <- services (via service_id)
     conn.execute(sa.text("""
-        UPDATE subscription_plan_credit spc
-        SET empresa_id = s.empresa_id, unidade_id = s.unidade_id
-        FROM services s
-        WHERE spc.service_id = s.id
+        UPDATE subscription_plan_credit
+        SET empresa_id = (SELECT s.empresa_id FROM services s WHERE s.id = subscription_plan_credit.service_id),
+            unidade_id = (SELECT s.unidade_id FROM services s WHERE s.id = subscription_plan_credit.service_id)
     """))
 
     # service_kit <- primeiro item do próprio kit (já backfillado acima)
     conn.execute(sa.text("""
-        UPDATE service_kit sk
-        SET empresa_id = sub.empresa_id, unidade_id = sub.unidade_id
-        FROM (
-            SELECT DISTINCT ON (kit_id) kit_id, empresa_id, unidade_id
-            FROM service_kit_item
-            WHERE empresa_id IS NOT NULL
-            ORDER BY kit_id, id
-        ) sub
-        WHERE sk.id = sub.kit_id
+        UPDATE service_kit
+        SET empresa_id = (
+                SELECT ski.empresa_id FROM service_kit_item ski
+                WHERE ski.kit_id = service_kit.id AND ski.empresa_id IS NOT NULL
+                ORDER BY ski.id LIMIT 1
+            ),
+            unidade_id = (
+                SELECT ski.unidade_id FROM service_kit_item ski
+                WHERE ski.kit_id = service_kit.id AND ski.empresa_id IS NOT NULL
+                ORDER BY ski.id LIMIT 1
+            )
     """))
 
     # subscription_plan <- primeiro credit do próprio plano
     conn.execute(sa.text("""
-        UPDATE subscription_plan sp
-        SET empresa_id = sub.empresa_id, unidade_id = sub.unidade_id
-        FROM (
-            SELECT DISTINCT ON (plan_id) plan_id, empresa_id, unidade_id
-            FROM subscription_plan_credit
-            WHERE empresa_id IS NOT NULL
-            ORDER BY plan_id, id
-        ) sub
-        WHERE sp.id = sub.plan_id
+        UPDATE subscription_plan
+        SET empresa_id = (
+                SELECT spc.empresa_id FROM subscription_plan_credit spc
+                WHERE spc.plan_id = subscription_plan.id AND spc.empresa_id IS NOT NULL
+                ORDER BY spc.id LIMIT 1
+            ),
+            unidade_id = (
+                SELECT spc.unidade_id FROM subscription_plan_credit spc
+                WHERE spc.plan_id = subscription_plan.id AND spc.empresa_id IS NOT NULL
+                ORDER BY spc.id LIMIT 1
+            )
     """))
 
     # customer_subscription <- customers (via customer_id)
     conn.execute(sa.text("""
-        UPDATE customer_subscription cs
-        SET empresa_id = c.empresa_id
-        FROM customers c
-        WHERE cs.customer_id = c.id
+        UPDATE customer_subscription
+        SET empresa_id = (SELECT c.empresa_id FROM customers c WHERE c.id = customer_subscription.customer_id)
     """))
 
     # subscription_credit_balance <- customer_subscription (já backfillado)
     conn.execute(sa.text("""
-        UPDATE subscription_credit_balance scb
-        SET empresa_id = cs.empresa_id
-        FROM customer_subscription cs
-        WHERE scb.subscription_id = cs.id
+        UPDATE subscription_credit_balance
+        SET empresa_id = (
+            SELECT cs.empresa_id FROM customer_subscription cs WHERE cs.id = subscription_credit_balance.subscription_id
+        )
     """))
 
     # subscription_credit_usage <- customer_subscription (já backfillado)
     conn.execute(sa.text("""
-        UPDATE subscription_credit_usage scu
-        SET empresa_id = cs.empresa_id
-        FROM customer_subscription cs
-        WHERE scu.subscription_id = cs.id
+        UPDATE subscription_credit_usage
+        SET empresa_id = (
+            SELECT cs.empresa_id FROM customer_subscription cs WHERE cs.id = subscription_credit_usage.subscription_id
+        )
     """))
 
     # raffle_winners <- customers (via customer_id, nullable — pode não bater)
     conn.execute(sa.text("""
-        UPDATE raffle_winners rw
-        SET empresa_id = c.empresa_id
-        FROM customers c
-        WHERE rw.customer_id = c.id
+        UPDATE raffle_winners
+        SET empresa_id = (SELECT c.empresa_id FROM customers c WHERE c.id = raffle_winners.customer_id)
     """))
 
     # raffle_winners restantes (customer_id nulo ou cliente já não existe)
@@ -179,63 +182,69 @@ def upgrade():
     # raffle_winners: agora que raffles está com empresa_id garantido,
     # fecha qualquer winner que não bateu via customer_id.
     conn.execute(sa.text("""
-        UPDATE raffle_winners rw
-        SET empresa_id = r.empresa_id
-        FROM raffles r
-        WHERE rw.raffle_id = r.id AND rw.empresa_id IS NULL
+        UPDATE raffle_winners
+        SET empresa_id = (SELECT r.empresa_id FROM raffles r WHERE r.id = raffle_winners.raffle_id)
+        WHERE raffle_winners.empresa_id IS NULL
     """))
 
     # ════════════════════════════════════════════════════════════════
     # 4. NOT NULL + índices + FKs
+    #
+    # batch_alter_table: SQLite não suporta ALTER COLUMN / ADD CONSTRAINT
+    # nativamente -- Alembic recria a tabela por baixo dos panos com o
+    # schema final. Transparente no Postgres (roda como ALTER TABLE
+    # direto, sem recriar nada).
     # ════════════════════════════════════════════════════════════════
     for tabela in [
         'service_kit', 'service_kit_item', 'subscription_plan', 'subscription_plan_credit',
         'customer_subscription', 'subscription_credit_balance', 'subscription_credit_usage',
         'raffles', 'raffle_winners',
     ]:
-        op.alter_column(tabela, 'empresa_id', nullable=False)
+        with op.batch_alter_table(tabela) as batch_op:
+            batch_op.alter_column('empresa_id', nullable=False)
+            batch_op.create_foreign_key(f'{tabela}_empresa_id_fkey', 'empresas', ['empresa_id'], ['id'])
         op.create_index(f'ix_{tabela}_empresa_id', tabela, ['empresa_id'])
-        op.create_foreign_key(f'{tabela}_empresa_id_fkey', tabela, 'empresas', ['empresa_id'], ['id'])
 
     for tabela in ['service_kit', 'service_kit_item', 'subscription_plan', 'subscription_plan_credit']:
-        op.alter_column(tabela, 'unidade_id', nullable=False)
+        with op.batch_alter_table(tabela) as batch_op:
+            batch_op.alter_column('unidade_id', nullable=False)
+            batch_op.create_foreign_key(f'{tabela}_unidade_id_fkey', 'unidades', ['unidade_id'], ['id'])
         op.create_index(f'ix_{tabela}_unidade_id', tabela, ['unidade_id'])
-        op.create_foreign_key(f'{tabela}_unidade_id_fkey', tabela, 'unidades', ['unidade_id'], ['id'])
 
     # ════════════════════════════════════════════════════════════════
     # 5. subscription_credit_usage.appointment_id: NO ACTION -> SET NULL
     # ════════════════════════════════════════════════════════════════
-    op.drop_constraint(
-        'subscription_credit_usage_appointment_id_fkey',
-        'subscription_credit_usage', type_='foreignkey',
-    )
-    op.create_foreign_key(
-        'subscription_credit_usage_appointment_id_fkey',
-        'subscription_credit_usage', 'appointments', ['appointment_id'], ['id'],
-        ondelete='SET NULL',
-    )
+    with op.batch_alter_table('subscription_credit_usage') as batch_op:
+        batch_op.drop_constraint('subscription_credit_usage_appointment_id_fkey', type_='foreignkey')
+        batch_op.create_foreign_key(
+            'subscription_credit_usage_appointment_id_fkey', 'appointments', ['appointment_id'], ['id'],
+            ondelete='SET NULL',
+        )
 
 
 def downgrade():
-    op.drop_constraint(
-        'subscription_credit_usage_appointment_id_fkey',
-        'subscription_credit_usage', type_='foreignkey',
-    )
-    op.create_foreign_key(
-        'subscription_credit_usage_appointment_id_fkey',
-        'subscription_credit_usage', 'appointments', ['appointment_id'], ['id'],
-    )
+    with op.batch_alter_table('subscription_credit_usage') as batch_op:
+        batch_op.drop_constraint('subscription_credit_usage_appointment_id_fkey', type_='foreignkey')
+        batch_op.create_foreign_key(
+            'subscription_credit_usage_appointment_id_fkey', 'appointments', ['appointment_id'], ['id'],
+        )
 
+    # drop_index precisa acontecer DENTRO do batch, antes do drop_column
+    # correspondente -- ver comentário equivalente na migração
+    # 45c96fce867f (mesmo motivo: modo batch do SQLite tenta recriar o
+    # índice ao reconstruir a tabela e quebra se a coluna já sumiu).
     for tabela in ['service_kit', 'service_kit_item', 'subscription_plan', 'subscription_plan_credit']:
-        op.drop_constraint(f'{tabela}_unidade_id_fkey', tabela, type_='foreignkey')
-        op.drop_index(f'ix_{tabela}_unidade_id', table_name=tabela)
-        op.drop_column(tabela, 'unidade_id')
+        with op.batch_alter_table(tabela) as batch_op:
+            batch_op.drop_constraint(f'{tabela}_unidade_id_fkey', type_='foreignkey')
+            batch_op.drop_index(f'ix_{tabela}_unidade_id')
+            batch_op.drop_column('unidade_id')
 
     for tabela in [
         'service_kit', 'service_kit_item', 'subscription_plan', 'subscription_plan_credit',
         'customer_subscription', 'subscription_credit_balance', 'subscription_credit_usage',
         'raffles', 'raffle_winners',
     ]:
-        op.drop_constraint(f'{tabela}_empresa_id_fkey', tabela, type_='foreignkey')
-        op.drop_index(f'ix_{tabela}_empresa_id', table_name=tabela)
-        op.drop_column(tabela, 'empresa_id')
+        with op.batch_alter_table(tabela) as batch_op:
+            batch_op.drop_constraint(f'{tabela}_empresa_id_fkey', type_='foreignkey')
+            batch_op.drop_index(f'ix_{tabela}_empresa_id')
+            batch_op.drop_column('empresa_id')

@@ -186,24 +186,30 @@ def upgrade():
         )
     )
 
-    op.alter_column('users', 'nome', nullable=False)
-    op.alter_column('users', 'papel', nullable=False)
-    op.alter_column('users', 'empresa_id', nullable=False)
-    op.alter_column('users', 'senha_hash', nullable=False)
-    op.alter_column('users', 'ativo', nullable=False)
-
     op.drop_index('ix_users_username', table_name='users')
     op.drop_index('ix_users_email', table_name='users')  # era unique global
-    op.drop_column('users', 'username')
-    op.drop_column('users', 'role')
-    op.drop_column('users', 'is_active')
-    op.drop_column('users', 'created_at')
-    op.drop_column('users', 'password_hash')
+
+    # batch_alter_table: SQLite não suporta ALTER COLUMN / ADD-DROP
+    # CONSTRAINT / DROP COLUMN nativamente (só Postgres roda isso como
+    # ALTER TABLE direto) -- em SQLite o Alembic recria a tabela inteira
+    # por baixo dos panos com o schema final. Transparente no Postgres
+    # (roda como ALTER TABLE normal, sem recriar nada).
+    with op.batch_alter_table('users') as batch_op:
+        batch_op.alter_column('nome', nullable=False)
+        batch_op.alter_column('papel', nullable=False)
+        batch_op.alter_column('empresa_id', nullable=False)
+        batch_op.alter_column('senha_hash', nullable=False)
+        batch_op.alter_column('ativo', nullable=False)
+        batch_op.drop_column('username')
+        batch_op.drop_column('role')
+        batch_op.drop_column('is_active')
+        batch_op.drop_column('created_at')
+        batch_op.drop_column('password_hash')
+        batch_op.create_foreign_key('users_empresa_id_fkey', 'empresas', ['empresa_id'], ['id'])
+        batch_op.create_unique_constraint('uq_usuario_empresa_email', ['empresa_id', 'email'])
 
     op.create_index('ix_users_email', 'users', ['email'], unique=False)
     op.create_index('ix_users_empresa_id', 'users', ['empresa_id'], unique=False)
-    op.create_foreign_key('users_empresa_id_fkey', 'users', 'empresas', ['empresa_id'], ['id'])
-    op.create_unique_constraint('uq_usuario_empresa_email', 'users', ['empresa_id', 'email'])
 
     # ════════════════════════════════════════════════════════════════
     # 4. barbers -> Profissional (usuario_id nullable + ondelete=SET NULL,
@@ -228,22 +234,21 @@ def upgrade():
         )
     )
 
-    op.alter_column('barbers', 'empresa_id', nullable=False)
-    op.alter_column('barbers', 'unidade_id', nullable=False)
+    with op.batch_alter_table('barbers') as batch_op:
+        batch_op.alter_column('empresa_id', nullable=False)
+        batch_op.alter_column('unidade_id', nullable=False)
+        batch_op.drop_constraint('barbers_user_id_fkey', type_='foreignkey')
+        batch_op.drop_constraint('barbers_user_id_key', type_='unique')
+        batch_op.drop_column('user_id')
+        batch_op.create_unique_constraint('barbers_usuario_id_key', ['usuario_id'])
+        batch_op.create_foreign_key(
+            'barbers_usuario_id_fkey', 'users', ['usuario_id'], ['id'], ondelete='SET NULL',
+        )
+        batch_op.create_foreign_key('barbers_empresa_id_fkey', 'empresas', ['empresa_id'], ['id'])
+        batch_op.create_foreign_key('barbers_unidade_id_fkey', 'unidades', ['unidade_id'], ['id'])
 
-    op.drop_constraint('barbers_user_id_fkey', 'barbers', type_='foreignkey')
-    op.drop_constraint('barbers_user_id_key', 'barbers', type_='unique')
-    op.drop_column('barbers', 'user_id')
-
-    op.create_unique_constraint('barbers_usuario_id_key', 'barbers', ['usuario_id'])
-    op.create_foreign_key(
-        'barbers_usuario_id_fkey', 'barbers', 'users', ['usuario_id'], ['id'],
-        ondelete='SET NULL',
-    )
     op.create_index('ix_barbers_empresa_id', 'barbers', ['empresa_id'], unique=False)
     op.create_index('ix_barbers_unidade_id', 'barbers', ['unidade_id'], unique=False)
-    op.create_foreign_key('barbers_empresa_id_fkey', 'barbers', 'empresas', ['empresa_id'], ['id'])
-    op.create_foreign_key('barbers_unidade_id_fkey', 'barbers', 'unidades', ['unidade_id'], ['id'])
 
     # ════════════════════════════════════════════════════════════════
     # 5. customers -> Cliente (empresa_id, unidade_origem_id de referência,
@@ -264,16 +269,18 @@ def upgrade():
         )
     )
 
-    op.alter_column('customers', 'empresa_id', nullable=False)
-
     op.drop_index('ix_customers_cpf', table_name='customers')  # era unique global
+
+    with op.batch_alter_table('customers') as batch_op:
+        batch_op.alter_column('empresa_id', nullable=False)
+        batch_op.create_foreign_key('customers_empresa_id_fkey', 'empresas', ['empresa_id'], ['id'])
+        batch_op.create_foreign_key(
+            'customers_unidade_origem_id_fkey', 'unidades', ['unidade_origem_id'], ['id'],
+        )
+        batch_op.create_unique_constraint('uq_cliente_empresa_cpf', ['empresa_id', 'cpf'])
+
     op.create_index('ix_customers_cpf', 'customers', ['cpf'], unique=False)
     op.create_index('ix_customers_empresa_id', 'customers', ['empresa_id'], unique=False)
-    op.create_foreign_key('customers_empresa_id_fkey', 'customers', 'empresas', ['empresa_id'], ['id'])
-    op.create_foreign_key(
-        'customers_unidade_origem_id_fkey', 'customers', 'unidades', ['unidade_origem_id'], ['id'],
-    )
-    op.create_unique_constraint('uq_cliente_empresa_cpf', 'customers', ['empresa_id', 'cpf'])
 
     # ════════════════════════════════════════════════════════════════
     # 6. services -> Servico (empresa_id, unidade_id)
@@ -286,12 +293,14 @@ def upgrade():
     )
     conn.execute(services_tbl.update().values(empresa_id=seed_empresa_id, unidade_id=seed_unidade_id))
 
-    op.alter_column('services', 'empresa_id', nullable=False)
-    op.alter_column('services', 'unidade_id', nullable=False)
+    with op.batch_alter_table('services') as batch_op:
+        batch_op.alter_column('empresa_id', nullable=False)
+        batch_op.alter_column('unidade_id', nullable=False)
+        batch_op.create_foreign_key('services_empresa_id_fkey', 'empresas', ['empresa_id'], ['id'])
+        batch_op.create_foreign_key('services_unidade_id_fkey', 'unidades', ['unidade_id'], ['id'])
+
     op.create_index('ix_services_empresa_id', 'services', ['empresa_id'], unique=False)
     op.create_index('ix_services_unidade_id', 'services', ['unidade_id'], unique=False)
-    op.create_foreign_key('services_empresa_id_fkey', 'services', 'empresas', ['empresa_id'], ['id'])
-    op.create_foreign_key('services_unidade_id_fkey', 'services', 'unidades', ['unidade_id'], ['id'])
 
     # ════════════════════════════════════════════════════════════════
     # 7. appointments -> Agendamento (empresa_id, unidade_id)
@@ -306,12 +315,14 @@ def upgrade():
         appointments_tbl.update().values(empresa_id=seed_empresa_id, unidade_id=seed_unidade_id)
     )
 
-    op.alter_column('appointments', 'empresa_id', nullable=False)
-    op.alter_column('appointments', 'unidade_id', nullable=False)
+    with op.batch_alter_table('appointments') as batch_op:
+        batch_op.alter_column('empresa_id', nullable=False)
+        batch_op.alter_column('unidade_id', nullable=False)
+        batch_op.create_foreign_key('appointments_empresa_id_fkey', 'empresas', ['empresa_id'], ['id'])
+        batch_op.create_foreign_key('appointments_unidade_id_fkey', 'unidades', ['unidade_id'], ['id'])
+
     op.create_index('ix_appointments_empresa_id', 'appointments', ['empresa_id'], unique=False)
     op.create_index('ix_appointments_unidade_id', 'appointments', ['unidade_id'], unique=False)
-    op.create_foreign_key('appointments_empresa_id_fkey', 'appointments', 'empresas', ['empresa_id'], ['id'])
-    op.create_foreign_key('appointments_unidade_id_fkey', 'appointments', 'unidades', ['unidade_id'], ['id'])
 
     # ════════════════════════════════════════════════════════════════
     # 8. barber_schedule_exception (empresa_id, unidade_id)
@@ -324,21 +335,21 @@ def upgrade():
     )
     conn.execute(bse_tbl.update().values(empresa_id=seed_empresa_id, unidade_id=seed_unidade_id))
 
-    op.alter_column('barber_schedule_exception', 'empresa_id', nullable=False)
-    op.alter_column('barber_schedule_exception', 'unidade_id', nullable=False)
+    with op.batch_alter_table('barber_schedule_exception') as batch_op:
+        batch_op.alter_column('empresa_id', nullable=False)
+        batch_op.alter_column('unidade_id', nullable=False)
+        batch_op.create_foreign_key(
+            'barber_schedule_exception_empresa_id_fkey', 'empresas', ['empresa_id'], ['id'],
+        )
+        batch_op.create_foreign_key(
+            'barber_schedule_exception_unidade_id_fkey', 'unidades', ['unidade_id'], ['id'],
+        )
+
     op.create_index(
         'ix_barber_schedule_exception_empresa_id', 'barber_schedule_exception', ['empresa_id'], unique=False,
     )
     op.create_index(
         'ix_barber_schedule_exception_unidade_id', 'barber_schedule_exception', ['unidade_id'], unique=False,
-    )
-    op.create_foreign_key(
-        'barber_schedule_exception_empresa_id_fkey',
-        'barber_schedule_exception', 'empresas', ['empresa_id'], ['id'],
-    )
-    op.create_foreign_key(
-        'barber_schedule_exception_unidade_id_fkey',
-        'barber_schedule_exception', 'unidades', ['unidade_id'], ['id'],
     )
 
 
@@ -354,46 +365,57 @@ def downgrade():
     conn = op.get_bind()
 
     # ── barber_schedule_exception ──────────────────────────────────────
-    op.drop_constraint('barber_schedule_exception_unidade_id_fkey', 'barber_schedule_exception', type_='foreignkey')
-    op.drop_constraint('barber_schedule_exception_empresa_id_fkey', 'barber_schedule_exception', type_='foreignkey')
-    op.drop_index('ix_barber_schedule_exception_unidade_id', table_name='barber_schedule_exception')
-    op.drop_index('ix_barber_schedule_exception_empresa_id', table_name='barber_schedule_exception')
-    op.drop_column('barber_schedule_exception', 'unidade_id')
-    op.drop_column('barber_schedule_exception', 'empresa_id')
+    # drop_index precisa acontecer DENTRO do mesmo batch, antes do
+    # drop_column correspondente -- se rodar depois, o Alembic já tentou
+    # recriar o índice ao reconstruir a tabela (modo batch do SQLite) e
+    # quebra com "no such column" porque a coluna já não existe mais nesse
+    # ponto. Transparente no Postgres de qualquer forma (ordem não importa
+    # lá, é tudo ALTER TABLE direto).
+    with op.batch_alter_table('barber_schedule_exception') as batch_op:
+        batch_op.drop_constraint('barber_schedule_exception_unidade_id_fkey', type_='foreignkey')
+        batch_op.drop_constraint('barber_schedule_exception_empresa_id_fkey', type_='foreignkey')
+        batch_op.drop_index('ix_barber_schedule_exception_unidade_id')
+        batch_op.drop_index('ix_barber_schedule_exception_empresa_id')
+        batch_op.drop_column('unidade_id')
+        batch_op.drop_column('empresa_id')
 
     # ── appointments ────────────────────────────────────────────────────
-    op.drop_constraint('appointments_unidade_id_fkey', 'appointments', type_='foreignkey')
-    op.drop_constraint('appointments_empresa_id_fkey', 'appointments', type_='foreignkey')
-    op.drop_index('ix_appointments_unidade_id', table_name='appointments')
-    op.drop_index('ix_appointments_empresa_id', table_name='appointments')
-    op.drop_column('appointments', 'unidade_id')
-    op.drop_column('appointments', 'empresa_id')
+    with op.batch_alter_table('appointments') as batch_op:
+        batch_op.drop_constraint('appointments_unidade_id_fkey', type_='foreignkey')
+        batch_op.drop_constraint('appointments_empresa_id_fkey', type_='foreignkey')
+        batch_op.drop_index('ix_appointments_unidade_id')
+        batch_op.drop_index('ix_appointments_empresa_id')
+        batch_op.drop_column('unidade_id')
+        batch_op.drop_column('empresa_id')
 
     # ── services ────────────────────────────────────────────────────────
-    op.drop_constraint('services_unidade_id_fkey', 'services', type_='foreignkey')
-    op.drop_constraint('services_empresa_id_fkey', 'services', type_='foreignkey')
-    op.drop_index('ix_services_unidade_id', table_name='services')
-    op.drop_index('ix_services_empresa_id', table_name='services')
-    op.drop_column('services', 'unidade_id')
-    op.drop_column('services', 'empresa_id')
+    with op.batch_alter_table('services') as batch_op:
+        batch_op.drop_constraint('services_unidade_id_fkey', type_='foreignkey')
+        batch_op.drop_constraint('services_empresa_id_fkey', type_='foreignkey')
+        batch_op.drop_index('ix_services_unidade_id')
+        batch_op.drop_index('ix_services_empresa_id')
+        batch_op.drop_column('unidade_id')
+        batch_op.drop_column('empresa_id')
 
     # ── customers ───────────────────────────────────────────────────────
-    op.drop_constraint('uq_cliente_empresa_cpf', 'customers', type_='unique')
-    op.drop_constraint('customers_unidade_origem_id_fkey', 'customers', type_='foreignkey')
-    op.drop_constraint('customers_empresa_id_fkey', 'customers', type_='foreignkey')
-    op.drop_index('ix_customers_empresa_id', table_name='customers')
+    with op.batch_alter_table('customers') as batch_op:
+        batch_op.drop_constraint('uq_cliente_empresa_cpf', type_='unique')
+        batch_op.drop_constraint('customers_unidade_origem_id_fkey', type_='foreignkey')
+        batch_op.drop_constraint('customers_empresa_id_fkey', type_='foreignkey')
+        batch_op.drop_index('ix_customers_empresa_id')
+        batch_op.drop_column('unidade_origem_id')
+        batch_op.drop_column('empresa_id')
     op.drop_index('ix_customers_cpf', table_name='customers')
     op.create_index('ix_customers_cpf', 'customers', ['cpf'], unique=True)
-    op.drop_column('customers', 'unidade_origem_id')
-    op.drop_column('customers', 'empresa_id')
 
     # ── barbers ─────────────────────────────────────────────────────────
-    op.drop_constraint('barbers_unidade_id_fkey', 'barbers', type_='foreignkey')
-    op.drop_constraint('barbers_empresa_id_fkey', 'barbers', type_='foreignkey')
+    with op.batch_alter_table('barbers') as batch_op:
+        batch_op.drop_constraint('barbers_unidade_id_fkey', type_='foreignkey')
+        batch_op.drop_constraint('barbers_empresa_id_fkey', type_='foreignkey')
+        batch_op.drop_constraint('barbers_usuario_id_fkey', type_='foreignkey')
+        batch_op.drop_constraint('barbers_usuario_id_key', type_='unique')
     op.drop_index('ix_barbers_unidade_id', table_name='barbers')
     op.drop_index('ix_barbers_empresa_id', table_name='barbers')
-    op.drop_constraint('barbers_usuario_id_fkey', 'barbers', type_='foreignkey')
-    op.drop_constraint('barbers_usuario_id_key', 'barbers', type_='unique')
 
     op.add_column('barbers', sa.Column('user_id', sa.Integer(), nullable=True))
     barbers_tbl = sa.table('barbers', sa.column('user_id', sa.Integer), sa.column('usuario_id', sa.Integer))
@@ -401,18 +423,20 @@ def downgrade():
     # Profissional sem usuario_id (relaxado nesta fase) não tem para onde
     # voltar num schema que exige user_id NOT NULL — downgrade só é seguro
     # se não houver nenhuma linha nessa situação.
-    op.alter_column('barbers', 'user_id', nullable=False)
-    op.create_unique_constraint('barbers_user_id_key', 'barbers', ['user_id'])
-    op.create_foreign_key(
-        'barbers_user_id_fkey', 'barbers', 'users', ['user_id'], ['id'], ondelete='CASCADE',
-    )
-    op.drop_column('barbers', 'unidade_id')
-    op.drop_column('barbers', 'empresa_id')
-    op.drop_column('barbers', 'usuario_id')
+    with op.batch_alter_table('barbers') as batch_op:
+        batch_op.alter_column('user_id', nullable=False)
+        batch_op.create_unique_constraint('barbers_user_id_key', ['user_id'])
+        batch_op.create_foreign_key(
+            'barbers_user_id_fkey', 'users', ['user_id'], ['id'], ondelete='CASCADE',
+        )
+        batch_op.drop_column('unidade_id')
+        batch_op.drop_column('empresa_id')
+        batch_op.drop_column('usuario_id')
 
     # ── users ───────────────────────────────────────────────────────────
-    op.drop_constraint('uq_usuario_empresa_email', 'users', type_='unique')
-    op.drop_constraint('users_empresa_id_fkey', 'users', type_='foreignkey')
+    with op.batch_alter_table('users') as batch_op:
+        batch_op.drop_constraint('uq_usuario_empresa_email', type_='unique')
+        batch_op.drop_constraint('users_empresa_id_fkey', type_='foreignkey')
     op.drop_index('ix_users_empresa_id', table_name='users')
     op.drop_index('ix_users_email', table_name='users')
 
@@ -445,21 +469,21 @@ def downgrade():
         )
     )
 
-    op.alter_column('users', 'username', nullable=False)
-    op.alter_column('users', 'role', nullable=False)
-    op.alter_column('users', 'is_active', nullable=False)
-    op.alter_column('users', 'password_hash', nullable=False)
+    with op.batch_alter_table('users') as batch_op:
+        batch_op.alter_column('username', nullable=False)
+        batch_op.alter_column('role', nullable=False)
+        batch_op.alter_column('is_active', nullable=False)
+        batch_op.alter_column('password_hash', nullable=False)
+        batch_op.drop_column('criado_em')
+        batch_op.drop_column('ativo')
+        batch_op.drop_column('senha_hash')
+        batch_op.drop_column('empresa_id')
+        batch_op.drop_column('is_superadmin')
+        batch_op.drop_column('papel')
+        batch_op.drop_column('nome')
 
     op.create_index('ix_users_username', 'users', ['username'], unique=True)
     op.create_index('ix_users_email', 'users', ['email'], unique=True)
-
-    op.drop_column('users', 'criado_em')
-    op.drop_column('users', 'ativo')
-    op.drop_column('users', 'senha_hash')
-    op.drop_column('users', 'empresa_id')
-    op.drop_column('users', 'is_superadmin')
-    op.drop_column('users', 'papel')
-    op.drop_column('users', 'nome')
 
     # ── tabelas novas ───────────────────────────────────────────────────
     op.drop_table('audit_log')

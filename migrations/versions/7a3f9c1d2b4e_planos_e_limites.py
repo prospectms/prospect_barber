@@ -84,7 +84,11 @@ def upgrade():
     # ════════════════════════════════════════════════════════════════
     # 2. empresas: plano_id vira FK real + periodicidade/preco_congelado
     # ════════════════════════════════════════════════════════════════
-    op.create_foreign_key('empresas_plano_id_fkey', 'empresas', 'planos', ['plano_id'], ['id'])
+    # batch_alter_table: SQLite não suporta ADD CONSTRAINT nativamente --
+    # Alembic recria a tabela com o schema final por baixo dos panos.
+    # Transparente no Postgres (roda como ALTER TABLE direto).
+    with op.batch_alter_table('empresas') as batch_op:
+        batch_op.create_foreign_key('empresas_plano_id_fkey', 'planos', ['plano_id'], ['id'])
     op.add_column('empresas', sa.Column('periodicidade', sa.String(length=10), nullable=True))
     op.add_column('empresas', sa.Column('preco_congelado', sa.Numeric(precision=10, scale=2), nullable=True))
 
@@ -93,10 +97,10 @@ def upgrade():
     #    criação real — é o que UsoMensal usa pra decidir se incrementa)
     # ════════════════════════════════════════════════════════════════
     op.add_column('appointments', sa.Column('agendamento_original_id', sa.Integer(), nullable=True))
-    op.create_foreign_key(
-        'appointments_agendamento_original_id_fkey',
-        'appointments', 'appointments', ['agendamento_original_id'], ['id'],
-    )
+    with op.batch_alter_table('appointments') as batch_op:
+        batch_op.create_foreign_key(
+            'appointments_agendamento_original_id_fkey', 'appointments', ['agendamento_original_id'], ['id'],
+        )
 
     # ════════════════════════════════════════════════════════════════
     # 4. uso_mensal
@@ -118,13 +122,13 @@ def downgrade():
     op.drop_index('ix_uso_mensal_empresa_id', table_name='uso_mensal')
     op.drop_table('uso_mensal')
 
-    op.drop_constraint(
-        'appointments_agendamento_original_id_fkey', 'appointments', type_='foreignkey',
-    )
-    op.drop_column('appointments', 'agendamento_original_id')
+    with op.batch_alter_table('appointments') as batch_op:
+        batch_op.drop_constraint('appointments_agendamento_original_id_fkey', type_='foreignkey')
+        batch_op.drop_column('agendamento_original_id')
 
-    op.drop_column('empresas', 'preco_congelado')
-    op.drop_column('empresas', 'periodicidade')
-    op.drop_constraint('empresas_plano_id_fkey', 'empresas', type_='foreignkey')
+    with op.batch_alter_table('empresas') as batch_op:
+        batch_op.drop_column('preco_congelado')
+        batch_op.drop_column('periodicidade')
+        batch_op.drop_constraint('empresas_plano_id_fkey', type_='foreignkey')
 
     op.drop_table('planos')
