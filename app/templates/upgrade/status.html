@@ -43,24 +43,23 @@
           {% endif %}
         </ul>
 
-        {% if assinatura.status == 'pendente' %}
+        {% if assinatura.forma_pagamento == 'pix' %}
         <div class="alert alert-info mt-3 mb-3 small">
+          <i class="bi bi-info-circle me-1"></i>
+          <strong>Pix não é débito automático.</strong> Diferente do cartão de crédito, o Pix
+          não renova sozinho — você precisa pagar o QR code/link manualmente a cada ciclo
+          ({{ assinatura.periodicidade }}) pra manter o plano ativo.
+        </div>
+        {% endif %}
+
+        {% if assinatura.status == 'pendente' %}
+        <div class="alert alert-info mb-3 small">
           Aguardando confirmação do pagamento pela operadora. Seu plano será liberado
           automaticamente assim que o pagamento for confirmado — pode levar alguns
           minutos. Atualize esta página pra ver o status mais recente.
         </div>
-        {% if assinatura.invoice_url %}
-        <a href="{{ assinatura.invoice_url }}" target="_blank" rel="noopener" class="btn btn-gold fw-bold">
-          <i class="bi bi-qr-code me-2"></i>Pagar agora
-        </a>
-        {% else %}
-        <div class="alert alert-warning mb-0 small">
-          Não conseguimos recuperar o link de pagamento automaticamente. Verifique seu
-          e-mail — a Asaas envia a fatura/cobrança por lá também.
-        </div>
-        {% endif %}
         {% elif assinatura.status == 'inadimplente' %}
-        <div class="alert alert-warning mt-3 mb-0 small">
+        <div class="alert alert-warning mb-3 small">
           Pagamento em atraso.
           {% if dias_restantes is not none %}
             {% if dias_restantes > 0 %}
@@ -71,6 +70,19 @@
             {% endif %}
           {% endif %}
         </div>
+        {% endif %}
+
+        {% if assinatura.status in ('pendente', 'inadimplente') %}
+          {% if assinatura.invoice_url %}
+          <a href="{{ assinatura.invoice_url }}" target="_blank" rel="noopener" class="btn btn-gold fw-bold">
+            <i class="bi bi-qr-code me-2"></i>Pagar agora
+          </a>
+          {% else %}
+          <div class="alert alert-warning mb-0 small">
+            Não conseguimos recuperar o link de pagamento automaticamente. Verifique seu
+            e-mail — a Asaas envia a fatura/cobrança por lá também.
+          </div>
+          {% endif %}
         {% endif %}
       </div>
     </div>

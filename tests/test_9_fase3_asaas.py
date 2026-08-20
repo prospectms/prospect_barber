@@ -50,7 +50,8 @@ def _criar_empresa(db, plano_id, n_unidades_extra=0, documento="11144477735", em
     return empresa.id
 
 
-def _nova_assinatura(db, empresa_id, plano_id, status="pendente", inadimplente_desde=None):
+def _nova_assinatura(db, empresa_id, plano_id, status="pendente", inadimplente_desde=None,
+                      forma_pagamento="pix", invoice_url=None):
     n = next(_contador)
     assinatura = Assinatura(
         empresa_id=empresa_id,
@@ -60,8 +61,9 @@ def _nova_assinatura(db, empresa_id, plano_id, status="pendente", inadimplente_d
         plano_id=plano_id,
         valor=79.99,
         periodicidade="mensal",
-        forma_pagamento="pix",
+        forma_pagamento=forma_pagamento,
         inadimplente_desde=inadimplente_desde,
+        invoice_url=invoice_url,
     )
     db.session.add(assinatura)
     db.session.commit()
@@ -420,6 +422,13 @@ def login_dono_a(client, login, empresa_a):
     return empresa_a
 
 
+@pytest.fixture
+def login_dono_b(client, login, empresa_b):
+    login(empresa_b["dono_email"], empresa_b["senha"])
+    client.post("/auth/unidade", data={"unidade_id": empresa_b["unidade_id"]}, follow_redirects=True)
+    return empresa_b
+
+
 def test_checkout_get_renderiza_formulario(client, login_dono_a, planos):
     r = client.get(f"/upgrade/checkout/{planos['pro']}")
     assert r.status_code == 200
@@ -529,3 +538,60 @@ def test_checkout_post_telefone_valido_passa_na_validacao(client, login_dono_a, 
     assert r.status_code == 200
     assert "celular inválido" not in r.text.lower()
     assert "/upgrade/status" in r.request.path
+
+
+# ── 8. tela de status: aviso de Pix + link de pagamento sempre visível ──────
+# Usa empresa_b (não empresa_a) de propósito -- isolado da longa cadeia de
+# testes de checkout HTTP acima, que já depende de ordem de execução pra
+# controlar qual é a Assinatura "mais recente" de empresa_a.
+def test_status_pix_mostra_aviso_de_nao_e_debito_automatico(app, db, client, login_dono_b, planos):
+    with app.app_context():
+        _nova_assinatura(
+            db, login_dono_b["empresa_id"], plano_id=planos["pro"], status="ativa",
+            forma_pagamento="pix",
+        )
+    r = client.get("/upgrade/status")
+    assert r.status_code == 200
+    assert "não é débito automático" in r.text.lower()
+
+
+def test_status_cartao_nao_mostra_aviso_de_pix(app, db, client, login_dono_b, planos):
+    with app.app_context():
+        _nova_assinatura(
+            db, login_dono_b["empresa_id"], plano_id=planos["pro"], status="ativa",
+            forma_pagamento="cartao",
+        )
+    r = client.get("/upgrade/status")
+    assert r.status_code == 200
+    assert "não é débito automático" not in r.text.lower()
+
+
+def test_status_pagar_agora_visivel_durante_inadimplencia_nao_so_no_checkout(app, db, client, login_dono_b, planos):
+    """Achado do Bloco 6: antes o botão "Pagar agora" só aparecia com
+    status='pendente' (o momento do checkout) -- uma assinatura que ficou
+    inadimplente em um ciclo já confirmado antes também tem uma cobrança em
+    aberto real, mas o botão sumia."""
+    with app.app_context():
+        _nova_assinatura(
+            db, login_dono_b["empresa_id"], plano_id=planos["pro"], status="inadimplente",
+            forma_pagamento="pix", invoice_url="https://sandbox.asaas.com/i/inadimplente-1",
+            inadimplente_desde=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+    r = client.get("/upgrade/status")
+    assert r.status_code == 200
+    assert "https://sandbox.asaas.com/i/inadimplente-1" in r.text
+    assert "pagar agora" in r.text.lower()
+
+
+def test_status_pagar_agora_nao_aparece_quando_assinatura_ja_esta_ativa(app, db, client, login_dono_b, planos):
+    """invoice_url não é atualizado a cada ciclo (ver comentário no model) --
+    uma vez 'ativa', o link guardado é da cobrança já paga. Mostrar o botão
+    aqui seria enganoso, então ele só aparece em pendente/inadimplente."""
+    with app.app_context():
+        _nova_assinatura(
+            db, login_dono_b["empresa_id"], plano_id=planos["pro"], status="ativa",
+            forma_pagamento="pix", invoice_url="https://sandbox.asaas.com/i/ja-paga",
+        )
+    r = client.get("/upgrade/status")
+    assert r.status_code == 200
+    assert "pagar agora" not in r.text.lower()
