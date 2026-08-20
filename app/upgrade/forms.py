@@ -4,14 +4,31 @@ from flask_wtf import FlaskForm
 from wtforms import RadioField, StringField
 from wtforms.validators import DataRequired, Email, Length, Optional, ValidationError
 
-# 10 digitos (DDD + fixo) ou 11 (DDD + celular com o 9 na frente), só
-# dígitos após remover formatação. Não tenta replicar a checagem de
-# "número plausível" que a própria Asaas faz do lado dela (ex.: rejeitou
-# "11999999999", dígito repetido, no smoke test contra o sandbox real de
-# 2026-08-12, mesmo sendo um formato válido) -- isso é responsabilidade
-# dela, o formulário só barra o que é estruturalmente malformado antes de
-# gastar uma chamada de API.
-_TELEFONE_RE = re.compile(r"^\d{10,11}$")
+# Celular brasileiro: 11 dígitos (DDD + 9 + 8 dígitos do assinante), só
+# dígitos após remover formatação. DDD checado só por faixa (11-99), sem
+# lista fechada dos códigos realmente atribuídos pela ANATEL -- manter essa
+# lista seria mais frágil que o ganho (DDD pode ser realocado). "9 na
+# frente" é regra oficial do número móvel desde 2016. Rejeitar assinante
+# com todos os dígitos iguais cobre o caso real que a própria Asaas
+# rejeitou no smoke test contra o sandbox (2026-08-12): "11999999999" tem
+# formato estruturalmente válido (11 dígitos, DDD ok, começa com 9) mas é
+# claramente forjado -- a Asaas rejeita isso do lado dela com um erro cru
+# em português; aqui a gente barra antes de gastar a chamada de API, com
+# mensagem nossa.
+_DDD_MIN, _DDD_MAX = 11, 99
+
+
+def _celular_valido(digitos: str) -> bool:
+    if len(digitos) != 11:
+        return False
+    if not (_DDD_MIN <= int(digitos[:2]) <= _DDD_MAX):
+        return False
+    numero_assinante = digitos[2:]
+    if numero_assinante[0] != "9":
+        return False
+    if len(set(numero_assinante)) == 1:
+        return False
+    return True
 
 
 class CheckoutForm(FlaskForm):
@@ -43,8 +60,11 @@ class CheckoutForm(FlaskForm):
         if not field.data:
             return
         digitos = re.sub(r"\D", "", field.data)
-        if not _TELEFONE_RE.match(digitos):
-            raise ValidationError("Telefone inválido. Use DDD + número, só dígitos (ex.: 11987654321).")
+        if not _celular_valido(digitos):
+            raise ValidationError(
+                "Celular inválido. Informe DDD + número com 9 dígitos, "
+                "começando em 9 (ex.: 11987654321)."
+            )
         field.data = digitos
 
     # Campos exigidos só quando forma_pagamento == 'cartao' -- validados

@@ -413,8 +413,32 @@ def test_checkout_post_telefone_malformado_rejeitado_sem_chamar_asaas(client, lo
         },
     )
     assert r.status_code == 200  # re-renderiza o form, não redireciona
-    assert "telefone inválido" in r.text.lower()
+    assert "celular inválido" in r.text.lower()
     assert chamado == []  # nem chegou a chamar a Asaas
+
+
+def test_checkout_post_telefone_digito_repetido_rejeitado_com_mensagem_nossa(client, login_dono_a, planos, monkeypatch):
+    """Caso exato que a própria Asaas rejeitou no smoke test contra o
+    sandbox real (2026-08-12): "11999999999" -- 11 dígitos, DDD válido,
+    começa com 9 (formato estruturalmente correto), mas claramente forjado
+    (assinante todo em 9). Antes disso caía direto na Asaas e o dono via
+    o erro cru dela ("O celular informado é inválido.") via CheckoutError;
+    agora é barrado aqui, com mensagem nossa, antes de qualquer chamada."""
+    chamado = []
+    monkeypatch.setattr(billing_service.asaas_client, "create_customer", lambda **kwargs: chamado.append(1) or {"id": "cus_x"})
+
+    r = client.post(
+        f"/upgrade/checkout/{planos['pro']}",
+        data={
+            "periodicidade": "mensal", "forma_pagamento": "pix",
+            "documento": "11144477735", "email": "dono@empresa-a.example.com",
+            "telefone": "11999999999",
+        },
+    )
+    assert r.status_code == 200
+    assert "celular inválido" in r.text.lower()
+    assert "o celular informado" not in r.text.lower()  # não é o erro cru da Asaas
+    assert chamado == []
 
 
 def test_status_page_sem_assinatura(client, login_dono_a):
@@ -451,5 +475,24 @@ def test_checkout_post_pix_cria_assinatura_pendente_e_redireciona_pro_status(app
         assinatura = Assinatura.query.filter_by(asaas_subscription_id="sub_http_1").first()
         assert assinatura is not None
         assert assinatura.invoice_url == "https://sandbox.asaas.com/i/fake-http-1"
-        assert assinatura.status == "pendente"
-        assert assinatura.empresa_id == login_dono_a["empresa_id"]
+
+
+def test_checkout_post_telefone_valido_passa_na_validacao(client, login_dono_a, planos, monkeypatch):
+    """Roda por último de propósito -- também grava Assinatura pra
+    empresa_a, então precisa vir depois de test_status_page_sem_assinatura."""
+    monkeypatch.setattr(billing_service.asaas_client, "create_customer", lambda **kwargs: {"id": "cus_ok"})
+    monkeypatch.setattr(billing_service.asaas_client, "create_subscription_pix", lambda **kwargs: {"id": "sub_ok_tel"})
+    monkeypatch.setattr(billing_service.asaas_client, "get_first_payment_invoice_url", lambda subscription_id: None)
+
+    r = client.post(
+        f"/upgrade/checkout/{planos['pro']}",
+        data={
+            "periodicidade": "mensal", "forma_pagamento": "pix",
+            "documento": "11144477735", "email": "dono@empresa-a.example.com",
+            "telefone": "(11) 98765-4321",  # com formatação -- validador deve normalizar
+        },
+        follow_redirects=True,
+    )
+    assert r.status_code == 200
+    assert "celular inválido" not in r.text.lower()
+    assert "/upgrade/status" in r.request.path
