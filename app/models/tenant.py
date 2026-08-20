@@ -69,7 +69,13 @@ class TenantQuery(_FSAQuery):
     """
 
     def get(self, ident):
-        obj = super().get(ident)
+        # Session.get() no lugar do Query.get() legado (SQLAlchemy 2.0
+        # depreca o segundo). column_descriptions[0]['entity'] é API
+        # pública e estável pra achar a classe mapeada a partir da query
+        # genérica — TenantQuery é a mesma classe pra todo model
+        # TenantMixin, não dá pra fixar a entidade em tempo de escrita.
+        entity = self.column_descriptions[0]["entity"]
+        obj = self.session.get(entity, ident)
         if obj is None:
             return None
         empresa_id = current_empresa_id()
