@@ -123,10 +123,24 @@ cd /var/www/barberhub
 sudo -u barberhub FLASK_CONFIG=production venv/bin/flask --app wsgi db upgrade
 ```
 
-> Não há mais comando de seed automático (era da era pré-multi-tenant). O
-> primeiro acesso é pela tela de cadastro de empresa (`/auth/signup` ou
-> equivalente) — crie o usuário dono real ali, não há admin/senha padrão
-> pra trocar.
+> **Correção (2026-08-20): esta observação estava errada.** Há comandos de
+> seed reais em `run.py` (raiz do projeto, não em `app/` — checagem
+> anterior só olhou `app/` e não achou nada lá). O que interessa em
+> produção é `flask seed-prospect`: cria a empresa interna da equipe +
+> o usuário superadmin (`administrativo@theprospect.com.br`,
+> `is_superadmin=True`), idempotente (só cria se o e-mail ainda não
+> existir — seguro rodar de novo pra só *checar* se a conta existe, sem
+> risco de sobrescrever senha já trocada). Senha padrão em texto puro no
+> próprio `run.py`: **troque manualmente após o primeiro login real** —
+> o comando já avisa isso, mas nada força a troca.
+>
+> ```bash
+> sudo -u barberhub FLASK_CONFIG=production venv/bin/flask --app run seed-prospect
+> ```
+>
+> Os demais seeds (`seed`, `seed-admin`, `seed-kits`, `seed-services`,
+> `seed-subscription-plans`) populam a empresa/unidade de **demo/dev**
+> (`empresa-demo-dev`) com dado fictício — não rode em produção.
 
 ---
 
