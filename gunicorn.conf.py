@@ -1,7 +1,9 @@
 import multiprocessing
 
 # ── Binding ───────────────────────────────────────────────────────────────────
-bind = "127.0.0.1:8000"
+# Servidor compartilhado com outros apps -- 8000/8001/8010/8080 já estavam
+# ocupados por outros serviços quando isso foi checado (2026-08-20).
+bind = "127.0.0.1:8020"
 
 # ── Workers ───────────────────────────────────────────────────────────────────
 # Fórmula recomendada pelo Gunicorn: (2 × CPUs) + 1

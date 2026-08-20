@@ -145,7 +145,7 @@ sudo systemctl start barberhub
 sudo systemctl status barberhub
 ```
 
-O Gunicorn escuta em `127.0.0.1:8000`. Nunca exponha essa porta diretamente — o Nginx faz o proxy.
+O Gunicorn escuta na porta definida em `bind` no `gunicorn.conf.py` (padrão `127.0.0.1:8020` — em servidor compartilhado com outros apps, confira com `sudo ss -tln` se a porta escolhida está livre antes de subir o serviço). Nunca exponha essa porta diretamente — o Nginx faz o proxy.
 
 **Comandos úteis:**
 
