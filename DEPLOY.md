@@ -154,9 +154,18 @@ O Gunicorn escuta na porta definida em `bind` no `gunicorn.conf.py` (padrão `12
 |------|---------|
 | Iniciar | `sudo systemctl start barberhub` |
 | Parar | `sudo systemctl stop barberhub` |
-| Reiniciar | `sudo systemctl restart barberhub` |
-| Reload graceful | `sudo systemctl reload barberhub` |
+| Reiniciar (aplica código/`.env` novos) | `sudo systemctl restart barberhub` |
 | Ver logs em tempo real | `sudo journalctl -u barberhub -f` |
+
+> **`reload` não serve pra atualizar código nem `.env` neste projeto.**
+> Com `preload_app=True` (`gunicorn.conf.py`), o app é importado uma vez
+> no processo master e os workers nascem a partir dessa cópia em memória
+> — um `reload` (SIGHUP) só recicla os workers usando essa mesma cópia
+> antiga, nunca reimporta o código do disco. `EnvironmentFile=` do
+> systemd também só é lido quando o processo nasce, não num reload.
+> **Sempre use `restart`** pra qualquer mudança de código ou variável de
+> ambiente — confirmado na prática em 2026-08-20 (um `reload` depois de
+> um `git pull` manteve a rota antiga no ar, gerando 404 na rota nova).
 
 ---
 
@@ -259,10 +268,16 @@ sudo -u barberhub bash /var/www/barberhub/deploy/deploy.sh
 cd /var/www/barberhub
 sudo -u barberhub git pull --ff-only
 sudo -u barberhub venv/bin/pip install -r requirements.txt -q
-sudo systemctl reload barberhub   # zero-downtime (graceful reload)
+sudo systemctl restart barberhub
 ```
 
-O `systemctl reload` envia `SIGHUP` ao Gunicorn: ele recria os workers gradualmente sem derrubar conexões ativas.
+`restart`, não `reload` — com `preload_app=True` (padrão deste projeto),
+`reload` (SIGHUP) recicla os workers usando a cópia do código já
+carregada em memória no processo master, sem reimportar nada do disco.
+Só `restart` reinicia o master e força a reimportação. Custa um breve
+downtime (segundos) em vez de zero-downtime, mas é o único jeito
+confiável de garantir que o código novo está de fato no ar — confirmado
+na prática em 2026-08-20 (ver seção 6).
 
 ---
 
