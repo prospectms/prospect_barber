@@ -20,11 +20,13 @@ from app.utils.limites import pode_criar
 
 _contador = itertools.count()
 _WEBHOOK_TOKEN = "test-webhook-token-fase3"
+_INTERNAL_TOKEN = "test-internal-token-fase3"
 
 
 @pytest.fixture(autouse=True)
 def _configura_token_webhook(app):
     app.config["ASAAS_WEBHOOK_TOKEN"] = _WEBHOOK_TOKEN
+    app.config["INTERNAL_JOB_TOKEN"] = _INTERNAL_TOKEN
 
 
 def _criar_empresa(db, plano_id, n_unidades_extra=0, documento="11144477735", email=None):
@@ -256,6 +258,37 @@ def test_downgrade_preserva_recursos_excedentes_mas_bloqueia_criacao(app, db, pl
         pode, motivo = pode_criar(empresa_id, "unidade")
         assert pode is False
         assert motivo == "upgrade_necessario"
+
+
+# ── 5b. endpoint interno do job (cron do SO, substitui APScheduler) ─────────
+def test_internal_downgrade_rejeita_sem_token(client):
+    r = client.post("/internal/downgrade-inadimplentes")
+    assert r.status_code == 401
+
+
+def test_internal_downgrade_rejeita_token_errado(client):
+    r = client.post("/internal/downgrade-inadimplentes", headers={"X-Internal-Token": "errado"})
+    assert r.status_code == 401
+
+
+def test_internal_downgrade_rejeita_quando_token_nao_configurado(client, app):
+    app.config["INTERNAL_JOB_TOKEN"] = ""
+    r = client.post("/internal/downgrade-inadimplentes", headers={"X-Internal-Token": ""})
+    assert r.status_code == 401
+
+
+def test_internal_downgrade_com_token_valido_roda_o_job(app, db, client, planos):
+    with app.app_context():
+        empresa_id = _criar_empresa(db, planos["pro"])
+        ha_9_dias = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=9)
+        _nova_assinatura(db, empresa_id, plano_id=planos["pro"], status="inadimplente", inadimplente_desde=ha_9_dias)
+
+    r = client.post("/internal/downgrade-inadimplentes", headers={"X-Internal-Token": _INTERNAL_TOKEN})
+    assert r.status_code == 200
+    assert r.get_json() == {"rebaixadas": 1}
+
+    with app.app_context():
+        assert Empresa.query.get(empresa_id).plano_id == planos["free"]
 
 
 # ── 6. checkout não libera plano antes do webhook ───────────────────────────

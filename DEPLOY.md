@@ -14,10 +14,11 @@ Stack de produção: **Ubuntu 22.04 LTS · Python 3.12 · Gunicorn · Nginx · S
 6. [Configurar o Gunicorn (systemd)](#6-configurar-o-gunicorn-systemd)
 7. [Configurar o Nginx](#7-configurar-o-nginx)
 8. [SSL com Let's Encrypt](#8-ssl-com-lets-encrypt)
-9. [Atualizar a aplicação (deploy)](#9-atualizar-a-aplicação-deploy)
-10. [Logs e monitoramento](#10-logs-e-monitoramento)
-11. [Migração para PostgreSQL](#11-migração-para-postgresql)
-12. [Estrutura de arquivos no servidor](#12-estrutura-de-arquivos-no-servidor)
+9. [Job diário de downgrade por inadimplência (cron)](#9-job-diário-de-downgrade-por-inadimplência-cron)
+10. [Atualizar a aplicação (deploy)](#10-atualizar-a-aplicação-deploy)
+11. [Logs e monitoramento](#11-logs-e-monitoramento)
+12. [Migração para PostgreSQL](#12-migração-para-postgresql)
+13. [Estrutura de arquivos no servidor](#13-estrutura-de-arquivos-no-servidor)
 
 ---
 
@@ -203,7 +204,44 @@ O certificado é renovado automaticamente antes de expirar (90 dias).
 
 ---
 
-## 9. Atualizar a aplicação (deploy)
+## 9. Job diário de downgrade por inadimplência (cron)
+
+Empresa com assinatura inadimplente há >= 8 dias é rebaixada pro plano
+Free automaticamente (ver `app/billing/service.py:downgrade_inadimplentes()`).
+Esse job **não** roda dentro do processo do Gunicorn — sob
+`preload_app=True` com múltiplos workers (padrão deste projeto, ver
+`gunicorn.conf.py`), uma thread de scheduler iniciada no processo master
+não sobrevive ao `fork()` de forma confiável nos workers filhos
+(confirmado como cenário real, não hipotético, no deploy de 2026-08-20).
+Por isso o job é um endpoint HTTP interno chamado por `cron` do próprio
+SO, fora do processo da aplicação inteiramente — funciona igual não
+importa a topologia (1 worker, N workers, Passenger no Hostinger).
+
+```bash
+# Gere um token e salve em INTERNAL_JOB_TOKEN no .env (ver passo 4)
+python3 -c "import secrets; print(secrets.token_hex(32))"
+
+# Registre o cron (roda todo dia às 3h da manhã)
+sudo -u barberhub crontab -e
+```
+
+Adicione a linha (substitua `SEU_TOKEN_AQUI` pelo mesmo valor de
+`INTERNAL_JOB_TOKEN` no `.env`):
+
+```cron
+0 3 * * * curl -sS -X POST -H "X-Internal-Token: SEU_TOKEN_AQUI" https://seudominio.com.br/internal/downgrade-inadimplentes >> /var/www/barberhub/logs/downgrade-cron.log 2>&1
+```
+
+Teste manualmente antes de confiar no agendamento:
+
+```bash
+curl -sS -X POST -H "X-Internal-Token: SEU_TOKEN_AQUI" https://seudominio.com.br/internal/downgrade-inadimplentes
+# Resposta esperada: {"rebaixadas": 0}  (ou > 0 se havia empresa pra rebaixar)
+```
+
+---
+
+## 10. Atualizar a aplicação (deploy)
 
 Para atualizar o código após um `git push`:
 
@@ -222,7 +260,7 @@ O `systemctl reload` envia `SIGHUP` ao Gunicorn: ele recria os workers gradualme
 
 ---
 
-## 10. Logs e monitoramento
+## 11. Logs e monitoramento
 
 | Log | Localização |
 |-----|-------------|
@@ -246,7 +284,7 @@ ps aux | grep gunicorn
 
 ---
 
-## 11. Migração para PostgreSQL
+## 12. Migração para PostgreSQL
 
 Quando precisar escalar para PostgreSQL:
 
@@ -283,7 +321,7 @@ sudo systemctl restart barberhub
 
 ---
 
-## 12. Estrutura de arquivos no servidor
+## 13. Estrutura de arquivos no servidor
 
 ```
 /var/www/barberhub/
@@ -322,3 +360,4 @@ sudo systemctl restart barberhub
 - [ ] Upload de foto de barbeiro testado
 - [ ] Geração de relatório Excel testada
 - [ ] Log de erros limpo: `tail -20 logs/barberhub.log`
+- [ ] `INTERNAL_JOB_TOKEN` gerado, salvo no `.env` e no crontab (passo 9) — teste manual do `curl` retornou `{"rebaixadas": ...}`

@@ -44,6 +44,12 @@ class Config:
     ASAAS_API_KEY = os.environ.get("ASAAS_API_KEY", "")
     ASAAS_WEBHOOK_TOKEN = os.environ.get("ASAAS_WEBHOOK_TOKEN", "")
 
+    # Job diário de downgrade por inadimplência (Fase 3, substituiu o
+    # APScheduler em processo — ver app/internal/routes.py). Segredo
+    # próprio, não reaproveita ASAAS_WEBHOOK_TOKEN: propósitos diferentes,
+    # vazamento de um não deve comprometer o outro.
+    INTERNAL_JOB_TOKEN = os.environ.get("INTERNAL_JOB_TOKEN", "")
+
 
 class DevelopmentConfig(Config):
     DEBUG = True
