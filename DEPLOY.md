@@ -220,6 +220,12 @@ importa a topologia (1 worker, N workers, Passenger no Hostinger).
 ```bash
 # Gere um token e salve em INTERNAL_JOB_TOKEN no .env (ver passo 4)
 python3 -c "import secrets; print(secrets.token_hex(32))"
+sudo nano /var/www/barberhub/.env   # adicione a linha INTERNAL_JOB_TOKEN=...
+
+# IMPORTANTE: reload (SIGHUP) NÃO recarrega variáveis de ambiente novas --
+# o systemd só lê EnvironmentFile= quando o processo é (re)iniciado do
+# zero, não num reload graceful. Precisa ser restart:
+sudo systemctl restart barberhub
 
 # Registre o cron (roda todo dia às 3h da manhã)
 sudo -u barberhub crontab -e
