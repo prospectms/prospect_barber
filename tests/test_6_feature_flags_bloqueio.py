@@ -101,3 +101,17 @@ def test_dashboard_e_agenda_publica_nao_mostram_link_de_raffle_subscriptions_par
     )
     assert "raffle" not in r.text.lower()
     assert "sorteio" not in r.text.lower()
+
+
+def test_dono_nao_ve_botao_nova_assinatura(client, login, empresa_a):
+    """Auditoria de completude CRUD (pré-lançamento): SubscriptionPlan não
+    tem nenhuma rota de criação -- "Nova assinatura" (matrícula num plano)
+    é permanentemente inutilizável até essa feature existir de verdade.
+    Botão fica oculto pra quem não é superadmin em vez de levar a um
+    formulário com dropdown de plano sempre vazio."""
+    login(empresa_a["dono_email"], empresa_a["senha"])
+    client.post("/auth/unidade", data={"unidade_id": empresa_a["unidade_id"]}, follow_redirects=True)
+
+    r = client.get("/subscriptions/")
+    assert "nova assinatura" not in r.text.lower()
+    assert "criar primeira assinatura" not in r.text.lower()

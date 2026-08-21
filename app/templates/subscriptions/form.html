@@ -80,9 +80,15 @@
               <div class="text-center py-4 text-muted">
                 <i class="bi bi-award d-block fs-3 mb-2 opacity-25"></i>
                 <div class="small">Nenhum plano cadastrado no sistema.</div>
+                {% if current_user.is_superadmin %}
                 <div class="mt-1 small text-muted fst-italic">
                   Execute <code>flask seed-subscription-plans</code> para criar planos de exemplo.
                 </div>
+                {% else %}
+                <div class="mt-1 small text-muted">
+                  Este recurso ainda não está disponível — fale com o suporte.
+                </div>
+                {% endif %}
               </div>
               {% endfor %}
             </div>
