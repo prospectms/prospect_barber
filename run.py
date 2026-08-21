@@ -1,8 +1,32 @@
 import os
+import click
 from app import create_app
 from app.extensions import db
 
 app = create_app(os.environ.get("FLASK_CONFIG", "development"))
+
+
+def _bloquear_em_producao(nome_comando: str) -> None:
+    """Trava dura, sem flag de bypass -- os comandos abaixo ou apagam o
+    schema inteiro (reset-db) ou criam empresa/usuário de demonstração com
+    credenciais fracas e públicas no código-fonte (admin123, barber123).
+    Nenhum dos dois tem motivo legítimo pra rodar contra produção.
+
+    Aconteceu de verdade uma vez: alguém rodou `flask seed` contra o
+    neondb real em 2026-08-04 (achado e corrigido só em 2026-08-21, ver
+    STATUS.md) -- as duas contas de demo ficaram sentadas em produção por
+    mais de duas semanas com senha pública no repositório. Checa
+    FLASK_CONFIG diretamente (mesma variável que create_app() usa aqui
+    embaixo pra decidir development/production) em vez de app.debug --
+    é o sinal mais direto de "isto é o deploy real", sem depender de
+    nenhuma outra configuração ter sido setada certo.
+    """
+    if os.environ.get("FLASK_CONFIG", "development") == "production":
+        raise click.ClickException(
+            f"'{nome_comando}' não roda com FLASK_CONFIG=production -- ele "
+            "apaga dado real ou cria conta de demonstração com senha pública "
+            "no código-fonte. Rode isso só em desenvolvimento local."
+        )
 
 
 def _get_or_create_demo_empresa_unidade():
@@ -55,6 +79,7 @@ def reset_db():
     deixa alembic_version apontando pra uma revisão que não bate mais com o
     schema real, quebrando o próximo `flask db upgrade`.
     """
+    _bloquear_em_producao("reset-db")
     from flask_migrate import downgrade, upgrade
     with app.app_context():
         downgrade(revision="base")
@@ -66,6 +91,7 @@ def reset_db():
 def seed():
     """Popula a empresa/unidade de demo com dados de exemplo: dono, funcionário
     (também profissional) e serviços. Idempotente."""
+    _bloquear_em_producao("seed")
     with app.app_context():
         from app.models.usuario import Usuario
         from app.models.usuario_unidade import UsuarioUnidade
@@ -131,6 +157,7 @@ def seed():
 @app.cli.command("seed-admin")
 def seed_admin():
     """Cria o usuário dono de desenvolvimento na empresa/unidade de demo (idempotente)."""
+    _bloquear_em_producao("seed-admin")
     with app.app_context():
         from app.models.usuario import Usuario
 
@@ -159,6 +186,7 @@ def seed_kits():
     visíveis pra qualquer empresa (o mesmo problema que o decorator
     bloqueado_enquanto_satelite_desativado evita nas rotas).
     """
+    _bloquear_em_producao("seed-kits")
     from app.utils.feature_flags import SATELLITE_FEATURES_ENABLED
     if not SATELLITE_FEATURES_ENABLED:
         print("ServiceKit é um model satélite sem escopo de tenant ainda (Fase 1-B). Seed desativado.")
@@ -182,6 +210,7 @@ def seed_subscription_plans():
     Bloqueado enquanto SATELLITE_FEATURES_ENABLED for False — mesma razão de
     seed-kits.
     """
+    _bloquear_em_producao("seed-subscription-plans")
     from app.utils.feature_flags import SATELLITE_FEATURES_ENABLED
     if not SATELLITE_FEATURES_ENABLED:
         print("SubscriptionPlan é um model satélite sem escopo de tenant ainda (Fase 1-B). Seed desativado.")
@@ -204,6 +233,7 @@ def seed_services():
     unidade já tiver serviços. Edite este seed com os serviços reais do
     cliente antes de usar em produção.
     """
+    _bloquear_em_producao("seed-services")
     with app.app_context():
         from app.models.servico import Servico
 
