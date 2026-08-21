@@ -9,9 +9,14 @@
       <div class="card-header d-flex justify-content-between align-items-center">
         <h6 class="fw-bold mb-0"><i class="bi bi-shop text-gold me-2"></i>Unidade ativa</h6>
         {% if current_user.is_dono %}
-        <a href="{{ url_for('unidades.new') }}" class="btn btn-sm btn-outline-gold">
-          <i class="bi bi-plus-circle me-1"></i>Nova unidade
-        </a>
+        <div class="d-flex gap-2">
+          <a href="{{ url_for('unidades.index') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-gear me-1"></i>Gerenciar
+          </a>
+          <a href="{{ url_for('unidades.new') }}" class="btn btn-sm btn-outline-gold">
+            <i class="bi bi-plus-circle me-1"></i>Nova unidade
+          </a>
+        </div>
         {% endif %}
       </div>
       <div class="card-body p-4">

@@ -36,6 +36,10 @@ def _idor_cases(b):
         ("post", f"/auth/users/{b['dono_id']}/toggle", "auth.toggle_user"),
         ("get",  f"/auth/users/{b['dono_id']}/reset-password", "auth.reset_password (GET)"),
         ("post", f"/auth/users/{b['dono_id']}/unlock", "auth.unlock_user"),
+        ("get",  f"/unidades/{b['unidade2_id']}/edit", "unidades.edit (GET)"),
+        ("post", f"/unidades/{b['unidade2_id']}/edit", "unidades.edit (POST)"),
+        ("post", f"/unidades/{b['unidade2_id']}/toggle", "unidades.toggle"),
+        ("post", f"/unidades/{b['unidade2_id']}/delete", "unidades.delete"),
     ]
 
 

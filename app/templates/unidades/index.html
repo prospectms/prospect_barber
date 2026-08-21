@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Unidades — Prospect Barber{% endblock %}
+{% block page_title %}Unidades{% endblock %}
+
+{% block content %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mt-2 mb-4">
+  <div>
+    <h5 class="fw-bold mb-1">Unidades da empresa</h5>
+    <div class="text-muted small">{{ unidades|length }} unidade(s) cadastrada(s)</div>
+  </div>
+  <a href="{{ url_for('unidades.new') }}" class="btn btn-gold">
+    <i class="bi bi-plus-circle-fill me-2"></i>Nova unidade
+  </a>
+</div>
+
+{% if unidades %}
+<div class="card card-dark">
+  <div class="table-responsive">
+    <table class="table table-dark table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Unidade</th>
+          <th class="d-none d-md-table-cell">Endereço</th>
+          <th class="d-none d-md-table-cell">Telefone</th>
+          <th class="text-center">Status</th>
+          <th class="text-end">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in unidades %}
+        <tr class="{% if not u.ativa %}service-inactive{% endif %}">
+          <td>
+            <div class="fw-semibold">{{ u.nome }}</div>
+            <div class="text-muted" style="font-size:.76rem">/agendar/{{ u.slug }}</div>
+          </td>
+          <td class="d-none d-md-table-cell">{{ u.endereco or "—" }}</td>
+          <td class="d-none d-md-table-cell">{{ u.telefone or "—" }}</td>
+          <td class="text-center">
+            <span class="badge {% if u.ativa %}badge-active{% else %}badge-inactive{% endif %}">
+              <i class="bi bi-circle-fill me-1" style="font-size:.4rem"></i>
+              {% if u.ativa %}Ativa{% else %}Inativa{% endif %}
+            </span>
+          </td>
+          <td class="text-end">
+            <div class="d-flex gap-1 justify-content-end">
+              <a href="{{ url_for('unidades.edit', unidade_id=u.id) }}"
+                 class="btn btn-sm btn-outline-light" title="Editar">
+                <i class="bi bi-pencil-fill"></i>
+              </a>
+              <form method="POST" action="{{ url_for('unidades.toggle', unidade_id=u.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit"
+                        class="btn btn-sm {% if u.ativa %}btn-outline-warning{% else %}btn-outline-success{% endif %}"
+                        title="{% if u.ativa %}Desativar{% else %}Ativar{% endif %}">
+                  <i class="bi bi-{% if u.ativa %}pause-fill{% else %}play-fill{% endif %}"></i>
+                </button>
+              </form>
+              <button type="button" class="btn btn-sm btn-outline-danger"
+                      data-bs-toggle="modal" data-bs-target="#delModal{{ u.id }}"
+                      title="Excluir">
+                <i class="bi bi-trash-fill"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Modais de exclusão ─────────────────────────────── -->
+{% for u in unidades %}
+<div class="modal fade" id="delModal{{ u.id }}" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark border border-danger border-opacity-50">
+      <div class="modal-header border-danger border-opacity-25">
+        <h6 class="modal-title text-danger fw-bold">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirmar exclusão
+        </h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Deseja excluir a unidade <strong class="text-white">{{ u.nome }}</strong>?</p>
+        <ul class="text-muted small mb-0">
+          <li>Esta ação <strong class="text-danger">não pode ser desfeita</strong></li>
+          <li class="mt-1">
+            Só é possível excluir uma unidade sem agendamento, profissional, serviço,
+            usuário vinculado ou cliente de origem — desative-a se ela tiver histórico.
+          </li>
+        </ul>
+      </div>
+      <div class="modal-footer border-danger border-opacity-25">
+        <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <form method="POST" action="{{ url_for('unidades.delete', unidade_id=u.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-danger btn-sm">
+            <i class="bi bi-trash-fill me-1"></i>Excluir
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{% else %}
+<div class="empty-state">
+  <i class="bi bi-shop empty-icon"></i>
+  <h6 class="fw-bold mt-3 mb-1">Nenhuma unidade cadastrada</h6>
+  <p class="text-muted small mb-3">Cadastre a primeira unidade da empresa.</p>
+  <a href="{{ url_for('unidades.new') }}" class="btn btn-gold btn-sm">
+    <i class="bi bi-plus-circle me-1"></i>Cadastrar unidade
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.service-inactive { opacity: .5; }
+.service-inactive:hover { opacity: .8; transition: opacity .15s; }
+
+.badge-active   { background: rgba(26,120,64,.10); color: #1A7840; border: 1px solid rgba(26,120,64,.25);   font-size: .7rem; padding: 4px 8px; }
+.badge-inactive { background: rgba(107,114,128,.10); color: #4A5568; border: 1px solid rgba(107,114,128,.25); font-size: .7rem; padding: 4px 8px; }
+
+.empty-state { text-align: center; padding: 80px 20px; }
+.empty-icon  { font-size: 3.5rem; color: rgba(255,255,255,.1); }
+</style>
+{% endblock %}

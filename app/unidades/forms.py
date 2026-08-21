@@ -19,6 +19,10 @@ class UnidadeForm(FlaskForm):
 
     submit = SubmitField("Criar unidade")
 
+    def __init__(self, unidade_id: int = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._unidade_id = unidade_id
+
     def validate_slug(self, field):
         from app.extensions import db
         slug = slugify(field.data)
@@ -37,8 +41,15 @@ class UnidadeForm(FlaskForm):
         # mesmo caso de tenant_bypass() (reservado a rotas de superadmin):
         # aqui só estamos checando se uma STRING pública já existe, não
         # lendo dado de outra empresa.
-        existe = db.session.execute(
-            db.text("SELECT 1 FROM unidades WHERE slug = :slug"), {"slug": slug}
-        ).first()
+        #
+        # unidade_id exclui a própria linha da checagem (edição) — sem
+        # isso, salvar uma unidade sem mudar o slug sempre falharia
+        # achando ela mesma como "já em uso".
+        query = "SELECT 1 FROM unidades WHERE slug = :slug"
+        params = {"slug": slug}
+        if self._unidade_id is not None:
+            query += " AND id != :unidade_id"
+            params["unidade_id"] = self._unidade_id
+        existe = db.session.execute(db.text(query), params).first()
         if existe:
             raise ValidationError(f"O endereço '{slug}' já está em uso. Escolha outro.")

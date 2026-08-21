@@ -101,6 +101,12 @@
     {% endif %}
 
     <div class="sidebar-section">Sistema</div>
+    {% if current_user.is_dono %}
+    <a href="{{ url_for('unidades.index') }}"
+       class="sidebar-link {% if request.blueprint == 'unidades' %}active{% endif %}">
+      <i class="bi bi-shop"></i><span>Unidades</span>
+    </a>
+    {% endif %}
     <a href="{{ url_for('auth.users') }}"
        class="sidebar-link {% if request.blueprint == 'auth' and 'user' in request.endpoint %}active{% endif %}">
       <i class="bi bi-shield-lock-fill"></i><span>Usuários</span>

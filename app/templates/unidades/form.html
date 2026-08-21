@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Nova Unidade{% endblock %}
-{% block page_title %}Nova Unidade{% endblock %}
+{% block title %}{% if action == "edit" %}Editar Unidade{% else %}Nova Unidade{% endif %}{% endblock %}
+{% block page_title %}{% if action == "edit" %}Editar Unidade{% else %}Nova Unidade{% endif %}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -10,9 +10,9 @@
     <nav class="mb-3" aria-label="breadcrumb">
       <ol class="breadcrumb breadcrumb-dark small">
         <li class="breadcrumb-item">
-          <a href="{{ url_for('auth.selecionar_unidade') }}" class="text-gold">Unidades</a>
+          <a href="{{ url_for('unidades.index') }}" class="text-gold">Unidades</a>
         </li>
-        <li class="breadcrumb-item active">Nova</li>
+        <li class="breadcrumb-item active">{% if action == "edit" %}Editar{% else %}Nova{% endif %}</li>
       </ol>
     </nav>
 
@@ -22,7 +22,8 @@
       <div class="card card-dark mb-4">
         <div class="card-header">
           <h6 class="fw-bold mb-0">
-            <i class="bi bi-shop text-gold me-2"></i>Cadastrar unidade
+            <i class="bi bi-shop text-gold me-2"></i>
+            {% if action == "edit" %}Editar unidade{% else %}Cadastrar unidade{% endif %}
           </h6>
         </div>
         <div class="card-body p-4">
@@ -68,8 +69,12 @@
       </div>
 
       <div class="d-flex gap-2">
+        {% if action == "edit" %}
+        <button type="submit" class="btn btn-gold px-4 fw-bold">Salvar alterações</button>
+        {% else %}
         {{ form.submit(class="btn btn-gold px-4 fw-bold") }}
-        <a href="{{ url_for('auth.selecionar_unidade') }}" class="btn btn-outline-secondary">Cancelar</a>
+        {% endif %}
+        <a href="{{ url_for('unidades.index') }}" class="btn btn-outline-secondary">Cancelar</a>
       </div>
     </form>
 
