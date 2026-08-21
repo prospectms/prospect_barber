@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Remarcar Agendamento — Prospect Barber{% endblock %}
+{% block page_title %}Remarcar Agendamento{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-xl-7 col-lg-8 col-md-10">
+
+    <!-- Breadcrumb -->
+    <nav class="mb-3" aria-label="breadcrumb">
+      <ol class="breadcrumb breadcrumb-dark small">
+        <li class="breadcrumb-item">
+          <a href="{{ url_for('appointments.index') }}" class="text-gold">Agendamentos</a>
+        </li>
+        <li class="breadcrumb-item active">Remarcar</li>
+      </ol>
+    </nav>
+
+    <div class="alert alert-info small mb-4">
+      <i class="bi bi-info-circle me-1"></i>
+      Remarcar cancela este agendamento e cria um novo no horário escolhido —
+      o histórico original fica preservado e isso não conta como um agendamento
+      novo pro uso mensal da empresa.
+    </div>
+
+    <form method="POST" novalidate>
+      {{ form.hidden_tag() }}
+
+      <div class="card card-dark mb-4">
+        <div class="card-header">
+          <h6 class="fw-bold mb-0">
+            <i class="bi bi-calendar-event-fill text-gold me-2"></i>Remarcar agendamento
+          </h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+
+            <!-- Cliente (fixo — não muda numa remarcação). form.customer_id tem
+                 uma única choice (o cliente atual) e vai escondido no POST;
+                 o campo visível é só um display, não é ele que valida. -->
+            <div class="col-12">
+              <label class="form-label fw-semibold small">Cliente</label>
+              <input type="text" class="form-control bg-dark border-secondary text-light"
+                     value="{{ appt.customer.name if appt.customer else '—' }}" disabled readonly>
+              {{ form.customer_id(class="d-none") }}
+              <div class="form-text">O cliente não muda numa remarcação — para atender outro cliente, cancele e crie um novo agendamento.</div>
+            </div>
+
+            <!-- Profissional -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">
+                {{ form.barber_id.label.text }} <span class="text-danger">*</span>
+              </label>
+              {{ form.barber_id(class="form-select bg-dark border-secondary text-light" + (" is-invalid" if form.barber_id.errors else "")) }}
+              {% for e in form.barber_id.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
+
+            <!-- Serviço -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">
+                {{ form.service_id.label.text }} <span class="text-danger">*</span>
+              </label>
+              {{ form.service_id(class="form-select bg-dark border-secondary text-light" + (" is-invalid" if form.service_id.errors else "")) }}
+              {% for e in form.service_id.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
+
+            <!-- Data + Horário -->
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">
+                {{ form.scheduled_date.label.text }} <span class="text-danger">*</span>
+              </label>
+              {{ form.scheduled_date(class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.scheduled_date.errors else "")) }}
+              {% for e in form.scheduled_date.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small">
+                {{ form.scheduled_time.label.text }} <span class="text-danger">*</span>
+              </label>
+              {{ form.scheduled_time(class="form-control bg-dark border-secondary text-light" + (" is-invalid" if form.scheduled_time.errors else ""), type="time", step="1800") }}
+              {% for e in form.scheduled_time.errors %}<div class="invalid-feedback">{{ e }}</div>{% endfor %}
+            </div>
+
+            <!-- Observações -->
+            <div class="col-12">
+              <label class="form-label fw-semibold small">{{ form.notes.label.text }}</label>
+              {{ form.notes(class="form-control bg-dark border-secondary text-light", rows=2) }}
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-gold px-4 fw-bold">
+          <i class="bi bi-arrow-repeat me-2"></i>Confirmar remarcação
+        </button>
+        <a href="{{ url_for('appointments.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+
+  </div>
+</div>
+{% endblock %}

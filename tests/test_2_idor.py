@@ -31,6 +31,8 @@ def _idor_cases(b):
         ("post", f"/services/{b['servico_id']}/toggle", "services.toggle"),
         ("post", f"/appointments/{b['agendamento_id']}/status", "appointments.update_status"),
         ("post", f"/appointments/{b['agendamento_id']}/delete", "appointments.delete"),
+        ("get",  f"/appointments/{b['agendamento_id']}/reschedule", "appointments.reschedule (GET)"),
+        ("post", f"/appointments/{b['agendamento_id']}/reschedule", "appointments.reschedule (POST)"),
         ("get",  f"/auth/users/{b['dono_id']}/edit", "auth.edit_user (GET)"),
         ("post", f"/auth/users/{b['dono_id']}/delete", "auth.delete_user"),
         ("post", f"/auth/users/{b['dono_id']}/toggle", "auth.toggle_user"),

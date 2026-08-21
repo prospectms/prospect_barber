@@ -199,13 +199,21 @@
           <!-- Ações -->
           <td class="text-end">
             {% if current_user.pode_gerenciar %}
-            <button type="button"
-                    class="btn btn-sm btn-outline-danger"
-                    data-bs-toggle="modal"
-                    data-bs-target="#delModal{{ a.id }}"
-                    title="Excluir">
-              <i class="bi bi-trash-fill"></i>
-            </button>
+            <div class="d-flex gap-1 justify-content-end">
+              {% if a.status in ('pending', 'confirmed') %}
+              <a href="{{ url_for('appointments.reschedule', appt_id=a.id) }}"
+                 class="btn btn-sm btn-outline-light" title="Remarcar">
+                <i class="bi bi-arrow-repeat"></i>
+              </a>
+              {% endif %}
+              <button type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      data-bs-toggle="modal"
+                      data-bs-target="#delModal{{ a.id }}"
+                      title="Excluir">
+                <i class="bi bi-trash-fill"></i>
+              </button>
+            </div>
             {% endif %}
           </td>
 

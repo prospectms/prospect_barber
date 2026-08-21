@@ -174,6 +174,87 @@ def new():
                            barbers=barbers, services=services, kits=kits)
 
 
+# ── Admin: Remarcar (Update — auditoria de completude pré-lançamento) ────────
+@appointments_bp.route("/<int:appt_id>/reschedule", methods=["GET", "POST"])
+@login_required
+@requer_papel("dono", "gerente")
+@requer_unidade
+def reschedule(appt_id: int):
+    """Não edita o Agendamento existente in-place -- cancela o antigo e cria
+    um novo com agendamento_original_id apontando pra ele, EXATO mesmo
+    padrão do reagendamento pelo portal do cliente (app/client/routes.py,
+    Fase 2). Isso é o que faz UsoMensal não contar a remarcação como
+    agendamento novo (registrar_agendamento_criado só é chamado quando esse
+    campo fica NULL -- aqui nunca é chamado, de propósito).
+
+    Diferente do portal do cliente: aqui o dono/gerente também pode trocar
+    o SERVIÇO (o cliente só pode trocar profissional/data/horário) -- o
+    cliente original nunca muda, isso não é uma nova reserva."""
+    appt = Agendamento.query.filter_by(id=appt_id, unidade_id=g.unidade_id).first_or_404()
+
+    if appt.status not in ("pending", "confirmed"):
+        flash("Este agendamento não pode ser remarcado.", "warning")
+        return redirect(url_for("appointments.index", date=str(appt.scheduled_date)))
+
+    barbers  = Profissional.query.filter_by(is_active=True, unidade_id=g.unidade_id).order_by(Profissional.name).all()
+    services = Servico.query.filter_by(is_active=True, unidade_id=g.unidade_id).order_by(Servico.name).all()
+
+    form = AppointmentAdminForm()
+    form.customer_id.choices = [(appt.customer_id, appt.customer.name if appt.customer else "—")]
+    form.barber_id.choices  = [(b.id, b.name) for b in barbers]
+    form.service_id.choices = [(s.id, f"{s.name}  ·  {s.duration_formatted}  ·  {s.price_formatted}") for s in services]
+
+    if request.method == "GET":
+        form.customer_id.data = appt.customer_id
+        form.barber_id.data = appt.barber_id
+        form.service_id.data = appt.service_id
+        form.scheduled_date.data = appt.scheduled_date
+        form.scheduled_time.data = appt.scheduled_time.strftime("%H:%M")
+        form.notes.data = appt.notes
+
+    if form.validate_on_submit():
+        barber_id = form.barber_id.data
+        service_id = form.service_id.data
+        sched_date = form.scheduled_date.data
+        sched_time = datetime.strptime(form.scheduled_time.data.strip(), "%H:%M").time()
+
+        if not is_slot_available(barber_id, service_id, sched_date, sched_time, exclude_appointment_id=appt.id):
+            flash("Horário indisponível: o profissional já tem um agendamento neste intervalo.", "danger")
+            return render_template("appointments/reschedule.html", form=form, appt=appt,
+                                   barbers=barbers, services=services)
+
+        had_credits = False
+        if SATELLITE_FEATURES_ENABLED:
+            from app.subscriptions.service import refund_credit
+            had_credits = refund_credit(g.empresa_id, appt.id)
+
+        appt.status = "cancelled"
+        new_appt = Agendamento(
+            empresa_id=g.empresa_id,
+            unidade_id=g.unidade_id,
+            customer_id=appt.customer_id,  # nunca do form -- cliente não muda numa remarcação
+            barber_id=barber_id,
+            service_id=service_id,
+            scheduled_date=sched_date,
+            scheduled_time=sched_time,
+            notes=(form.notes.data or "").strip() or None,
+            agendamento_original_id=appt.id,
+        )
+        db.session.add(new_appt)
+        db.session.flush()
+
+        if had_credits and SATELLITE_FEATURES_ENABLED:
+            from app.subscriptions.service import consume_credit
+            consume_credit(g.empresa_id, appt.customer_id, service_id, new_appt.id)
+
+        db.session.commit()
+        flash("Agendamento remarcado com sucesso!", "success")
+        return redirect(url_for("appointments.index", date=str(sched_date)))
+
+    return render_template("appointments/reschedule.html", form=form, appt=appt,
+                           barbers=barbers, services=services)
+
+
 # ── Admin / Funcionário: Atualizar status ─────────────────────────────────────
 @appointments_bp.route("/<int:appt_id>/status", methods=["POST"])
 @login_required
