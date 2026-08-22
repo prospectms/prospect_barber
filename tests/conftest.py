@@ -33,11 +33,20 @@ if _BACKEND == "postgres":
     # Banco descartável dedicado — mesmo projeto Neon do dev, nunca o
     # neondb. Precisa já ter o schema aplicado via `flask db upgrade`
     # antes de rodar a suíte (não é recriado aqui).
-    _DB_URL = (
-        "postgresql://neondb_owner:***REMOVED-CREDENCIAL-ROTACIONADA***@"
-        "ep-lingering-mode-ac38l7oo-pooler.sa-east-1.aws.neon.tech/"
-        "migration_dryrun?sslmode=require"
-    )
+    #
+    # NUNCA hardcode a credencial aqui -- achado numa auditoria de
+    # seguranca (2026-08-22): a senha real do neondb_owner ficou em texto
+    # puro nesse arquivo desde 04/08, foi parar no git (ate no origin/main
+    # publico) e precisou ser rotacionada no Neon inteiro. Vem de
+    # TEST_POSTGRES_URL no .env de quem for rodar a suite contra Postgres
+    # real -- ver .env.example.
+    _DB_URL = os.environ.get("TEST_POSTGRES_URL")
+    if not _DB_URL:
+        raise RuntimeError(
+            "TEST_DB_BACKEND=postgres exige TEST_POSTGRES_URL setada no "
+            "seu .env (connection string do banco descartável dedicado, "
+            "nunca o neondb real). Ver .env.example."
+        )
 else:
     _TEST_DB_PATH = os.path.join(
         r"C:\Users\NB-ALEX\AppData\Local\Temp\claude\d--Facul-barber-barber-prospect"
